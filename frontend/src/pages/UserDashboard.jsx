@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import {
   LayoutDashboard, Map, Info, LogOut, ShieldAlert, FileText, Camera, MapPin
 } from 'lucide-react';
+import { apiService } from '../services/api';
 import './Dashboard.css';
 
 export default function UserDashboard() {
@@ -44,16 +45,10 @@ export default function UserDashboard() {
           const { data: userData } = await supabase.auth.getUser();
           const userId = userData?.user?.id;
           
-          let url = 'http://localhost:5000/api/reports/conflict';
-          if (userId) {
-            url += `?userId=${userId}`;
-          }
+          let userIdParam = userId || null;
           
-          const res = await fetch(url);
-          if (res.ok) {
-            const result = await res.json();
-            setAllReports(result.data);
-          }
+          const result = await apiService.getAllReports(userIdParam);
+          setAllReports(result.data);
         } catch (err) {
           console.error("Failed to fetch reports", err);
         }
@@ -179,19 +174,7 @@ export default function UserDashboard() {
     console.log("Submitting Payload to Backend:", JSON.stringify(payload, null, 2));
 
     try {
-      const response = await fetch('http://localhost:5000/api/reports/conflict', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit report');
-      }
+      const data = await apiService.submitReport(payload);
 
       setReportSuccess({ 
         id: reportCode, 
@@ -331,14 +314,9 @@ export default function UserDashboard() {
                 <button onClick={() => setReportSuccess(null)} className="submit-btn" style={{ width: 'auto', padding: '12px 24px', background: '#3b82f6' }}>Submit Another Report</button>
                 <button onClick={async () => {
                   try {
-                    const res = await fetch(`http://localhost:5000/api/reports/conflict/${reportSuccess.id}`);
-                    if (res.ok) {
-                      const result = await res.json();
-                      setViewReportData(result.data);
-                      setActiveMenu('view-report');
-                    } else {
-                      alert("Failed to fetch report details");
-                    }
+                    const result = await apiService.getReportDetails(reportSuccess.id);
+                    setViewReportData(result.data);
+                    setActiveMenu('view-report');
                   } catch (err) {
                     alert("Error: " + err.message);
                   }
@@ -449,24 +427,18 @@ export default function UserDashboard() {
                           }
                         }
 
-                        const res = await fetch(`http://localhost:5000/api/reports/conflict/${viewReportData.report_code}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ 
-                            status: 'NEW', 
-                            clarification_text: clarificationText,
-                            ...(finalEvidenceUrl && { clarification_evidence_url: finalEvidenceUrl })
-                          })
+                        await apiService.updateReport(viewReportData.report_code, { 
+                          status: 'NEW', 
+                          clarification_id: viewReportData.report_clarifications?.filter(c => !c.user_reply).pop()?.id,
+                          clarification_reply: clarificationText,
+                          ...(finalEvidenceUrl && { clarification_evidence_url: finalEvidenceUrl })
                         });
                         
-                        if (res.ok) {
-                          setViewReportData({ ...viewReportData, status: 'NEW', clarification_text: clarificationText, clarification_evidence_url: finalEvidenceUrl });
-                          alert("Clarification submitted!");
-                          setClarificationText('');
-                          setClarificationFile(null);
-                        } else {
-                          alert("Failed to submit clarification.");
-                        }
+                        const result = await apiService.getReportDetails(viewReportData.report_code);
+                        setViewReportData(result.data); // Update with new history from backend
+                        alert("Clarification submitted!");
+                        setClarificationText('');
+                        setClarificationFile(null);
                       } catch (err) {
                         alert("Error: " + err.message);
                       }
@@ -515,27 +487,97 @@ export default function UserDashboard() {
                 )}
               </div>
 
-              {viewReportData.clarification_text && (
-                <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '12px', marginTop: '20px' }}>
-                  <h3 style={{ color: '#ef4444', margin: '0 0 12px 0', fontSize: '1.1rem' }}>Your Provided Clarification</h3>
-                  <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
-                    {viewReportData.clarification_text}
-                  </p>
-                  
-                  {viewReportData.clarification_evidence_url && (
-                    <div>
-                      <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Additional Photo:</p>
-                      <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
-                        <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <img 
-                            src={viewReportData.clarification_evidence_url} 
-                            alt="Clarification Evidence" 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        </div>
+              {viewReportData.response_assignments && viewReportData.response_assignments.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h3 style={{ color: '#38bdf8', margin: '0 0 16px 0', fontSize: '1.1rem' }}>Ranger Updates</h3>
+                  {viewReportData.response_assignments.map((assignment, idx) => (
+                    <div key={assignment.id || idx} style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.9rem' }}>
+                          Assigned Ranger: <span style={{ color: '#e2e8f0', fontWeight: 'bold' }}>{assignment.ranger_email}</span>
+                        </p>
+                        <span style={{ 
+                          padding: '4px 12px', 
+                          borderRadius: '20px', 
+                          fontSize: '0.8rem', 
+                          background: assignment.status === 'PENDING' ? 'rgba(245, 158, 11, 0.2)' : 
+                                      assignment.status === 'ACCEPTED' ? 'rgba(16, 185, 129, 0.2)' : 
+                                      assignment.status === 'DECLINED' ? 'rgba(239, 68, 68, 0.2)' : 
+                                      assignment.status === 'RESPONDING' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.1)',
+                          color: assignment.status === 'PENDING' ? '#f59e0b' : 
+                                 assignment.status === 'ACCEPTED' ? '#10b981' : 
+                                 assignment.status === 'DECLINED' ? '#ef4444' : 
+                                 assignment.status === 'RESPONDING' ? '#38bdf8' : '#e2e8f0'
+                        }}>
+                          {assignment.status}
+                        </span>
                       </div>
+                      
+                      {assignment.outcome && (
+                        <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>
+                          <h4 style={{ color: '#10b981', margin: '0 0 8px 0', fontSize: '1rem' }}>Outcome Recorded</h4>
+                          <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>{assignment.outcome}</p>
+                          
+                          {assignment.outcome_image_url && (
+                            <div>
+                              <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Photo:</p>
+                              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                                <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <img 
+                                    src={assignment.outcome_image_url} 
+                                    alt="Ranger Outcome Evidence" 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
+                </div>
+              )}
+
+              {viewReportData.report_clarifications && viewReportData.report_clarifications.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h3 style={{ color: '#34d399', margin: '0 0 16px 0', fontSize: '1.1rem' }}>Clarification History</h3>
+                  {viewReportData.report_clarifications.map((clarification, idx) => (
+                    <div key={clarification.id || idx} style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
+                      <p style={{ color: '#ef4444', margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                        Officer Request ({new Date(clarification.created_at).toLocaleString()}):
+                      </p>
+                      <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+                        {clarification.officer_request}
+                      </p>
+                      
+                      {clarification.user_reply && (
+                        <>
+                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0' }} />
+                          <p style={{ color: '#34d399', margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                            Your Reply:
+                          </p>
+                          <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+                            {clarification.user_reply}
+                          </p>
+                          {clarification.evidence_url && (
+                            <div>
+                              <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Photo:</p>
+                              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                                <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <img 
+                                    src={clarification.evidence_url} 
+                                    alt="Clarification Evidence" 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
 

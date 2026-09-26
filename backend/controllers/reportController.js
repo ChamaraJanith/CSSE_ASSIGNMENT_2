@@ -1,41 +1,19 @@
-const { supabaseAdmin } = require('../supabaseClient');
+const reportService = require('../services/reportService');
+
+const getRangers = async (req, res) => {
+    try {
+        const rangers = await reportService.getRangers();
+        res.status(200).json({ data: rangers });
+    } catch (error) {
+        console.error('Get Rangers Error:', error.message);
+        res.status(400).json({ error: error.message });
+    }
+};
 
 const createConflictReport = async (req, res) => {
     try {
-        const payload = req.body;
-        
-        // We assume the DB table is named 'conflict_reports'
-        // Using supabaseAdmin (Service Role) to bypass RLS policies
-        const { data, error } = await supabaseAdmin
-            .from('conflict_reports')
-            .insert([
-                {
-                    report_code: payload.reportCode,
-                    incident_type: payload.incidentType,
-                    incident_datetime: payload.incidentDateTime,
-                    description: payload.description,
-                    immediate_risk: payload.immediateRisk,
-                    area: payload.area,
-                    landmark: payload.landmark,
-                    latitude: payload.latitude,
-                    longitude: payload.longitude,
-                    reporter_name: payload.reporterName,
-                    contact_number: payload.contactNumber,
-                    preferred_contact_method: payload.preferredContactMethod,
-                    evidence_url: payload.evidenceUrl,
-                    consent_confirmed: payload.consentConfirmed,
-                    status: payload.status || 'NEW',
-                    priority: payload.priority || null,
-                    user_id: payload.user_id || null,
-                    // created_at is usually handled by DB default, but we can pass it if we want
-                    created_at: payload.createdAt
-                }
-            ])
-            .select(); // Return the inserted data
-
-        if (error) throw error;
-
-        res.status(201).json({ message: 'Report submitted successfully', data: data[0] });
+        const data = await reportService.createReport(req.body);
+        res.status(201).json({ message: 'Report submitted successfully', data });
     } catch (error) {
         console.error('Submit Report Error:', error.message);
         res.status(400).json({ error: error.message });
@@ -44,40 +22,19 @@ const createConflictReport = async (req, res) => {
 
 const getReportByCode = async (req, res) => {
     try {
-        const { code } = req.params;
-        const { data, error } = await supabaseAdmin
-            .from('conflict_reports')
-            .select('*')
-            .eq('report_code', code)
-            .single();
-
-        if (error) {
-            if (error.code === 'PGRST116') {
-                return res.status(404).json({ error: 'Report not found' });
-            }
-            throw error;
-        }
-
+        const data = await reportService.getReportByCode(req.params.code);
         res.status(200).json({ data });
     } catch (error) {
         console.error('Get Report Error:', error.message);
-        res.status(400).json({ error: error.message });
+        const status = error.status || 400;
+        res.status(status).json({ error: error.message });
     }
 };
 
 const getAllReports = async (req, res) => {
     try {
-        const { userId } = req.query;
-        let query = supabaseAdmin.from('conflict_reports').select('*').order('created_at', { ascending: false });
-        
-        if (userId) {
-            query = query.eq('user_id', userId);
-        }
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-
+        const { userId, rangerId } = req.query;
+        const data = await reportService.getAllReports(userId, rangerId);
         res.status(200).json({ data });
     } catch (error) {
         console.error('Get All Reports Error:', error.message);
@@ -88,23 +45,40 @@ const getAllReports = async (req, res) => {
 const updateReportStatus = async (req, res) => {
     try {
         const { code } = req.params;
-        const { status, priority, clarification_text, clarification_evidence_url } = req.body;
+        const { 
+            status, priority, 
+            clarification_request, clarification_reply, clarification_evidence_url, clarification_id, 
+            assigned_ranger_id, 
+            assignment_id, ranger_status, ranger_outcome, ranger_outcome_image 
+        } = req.body;
         
+        // 1. Update main report details
         const payload = {};
         if (status) payload.status = status;
         if (priority) payload.priority = priority;
-        if (clarification_text !== undefined) payload.clarification_text = clarification_text;
-        if (clarification_evidence_url !== undefined) payload.clarification_evidence_url = clarification_evidence_url;
+        await reportService.updateReportDetails(code, payload);
 
-        const { data, error } = await supabaseAdmin
-            .from('conflict_reports')
-            .update(payload)
-            .eq('report_code', code)
-            .select();
+        // 2. Handle Ranger Assignment
+        if (assigned_ranger_id) {
+            await reportService.assignRanger(code, assigned_ranger_id);
+        }
 
-        if (error) throw error;
+        // 3. Handle Ranger Outcome/Status update
+        if (assignment_id && ranger_status) {
+            await reportService.updateRangerAssignment(assignment_id, ranger_status, ranger_outcome, ranger_outcome_image);
+        }
+
+        // 4. Handle Clarifications
+        if (clarification_request) {
+            await reportService.requestClarification(code, clarification_request);
+        }
+        if (clarification_reply && clarification_id) {
+            await reportService.replyClarification(clarification_id, clarification_reply, clarification_evidence_url);
+        }
         
-        res.status(200).json({ message: 'Report updated successfully', data: data[0] });
+        // Fetch updated data
+        const data = await reportService.getReportByCode(code);
+        res.status(200).json({ message: 'Report updated successfully', data });
     } catch (error) {
         console.error('Update Status Error:', error.message);
         res.status(400).json({ error: error.message });
@@ -115,5 +89,6 @@ module.exports = {
     createConflictReport,
     getReportByCode,
     getAllReports,
-    updateReportStatus
+    updateReportStatus,
+    getRangers
 };

@@ -28,13 +28,17 @@ export default function Login() {
         .eq('user_id', data.user.id)
         .single();
 
+      console.log('Login Role Check:', { roleData, roleError, userId: data.user.id });
+
       // If they have no special role, they are just a regular public user!
       if (roleError || !roleData || !roleData.roles?.role_name) {
+        console.warn("No special role found, redirecting to /user");
         navigate('/user');
         return; // Stop here, routing is complete
       }
 
       const role = roleData.roles.role_name;
+      console.log('Assigned Role:', role);
 
       // 3. Route to correct dashboard based on role
       if (role === 'admin') {

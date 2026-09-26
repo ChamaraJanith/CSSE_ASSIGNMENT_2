@@ -5,6 +5,7 @@ import {
   LayoutDashboard, MessageSquare, FileText,
   Settings, LogOut, ShieldAlert, Bell, MapPin
 } from 'lucide-react';
+import { apiService } from '../services/api';
 import './Dashboard.css';
 
 export default function CLODashboard() {
@@ -13,24 +14,35 @@ export default function CLODashboard() {
 
   const [allReports, setAllReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [rangers, setRangers] = useState([]);
+  const [selectedRanger, setSelectedRanger] = useState('');
+  
+  React.useEffect(() => {
+    const fetchRangers = async () => {
+      try {
+        const result = await apiService.getRangers();
+        setRangers(result.data || []);
+      } catch (err) {
+        console.error("Failed to fetch rangers", err);
+      }
+    };
+    fetchRangers();
+  }, []);
   
   React.useEffect(() => {
     if (activeMenu === 'community') {
       const fetchReports = async () => {
         try {
-          const res = await fetch('http://localhost:5000/api/reports/conflict');
-          if (res.ok) {
-            const result = await res.json();
-            // Sort: NEW status first, then by immediate_risk
-            const sorted = result.data.sort((a, b) => {
-              if (a.status === 'NEW' && b.status !== 'NEW') return -1;
-              if (b.status === 'NEW' && a.status !== 'NEW') return 1;
-              if (a.immediate_risk && !b.immediate_risk) return -1;
-              if (b.immediate_risk && !a.immediate_risk) return 1;
-              return 0;
-            });
-            setAllReports(sorted);
-          }
+          const result = await apiService.getAllReports();
+          // Sort: NEW status first, then by immediate_risk
+          const sorted = result.data.sort((a, b) => {
+            if (a.status === 'NEW' && b.status !== 'NEW') return -1;
+            if (b.status === 'NEW' && a.status !== 'NEW') return 1;
+            if (a.immediate_risk && !b.immediate_risk) return -1;
+            if (b.immediate_risk && !a.immediate_risk) return 1;
+            return 0;
+          });
+          setAllReports(sorted);
         } catch (err) {
           console.error("Failed to fetch reports", err);
         }
@@ -44,25 +56,17 @@ export default function CLODashboard() {
     navigate('/login');
   };
 
-  const handleUpdateStatus = async (code, newStatus, newPriority = null) => {
+  const handleUpdateStatus = async (code, newStatus, newPriority = null, clarificationRequest = null, assignedRangerId = null, rangerStatus = null) => {
     try {
       const payload = { status: newStatus };
       if (newPriority) payload.priority = newPriority;
-      // We need to implement PATCH priority in backend too if we want to save it, but let's assume we can patch status.
-      // Wait, let's just patch status for now, and if we need to patch priority we should add it to backend.
-      // We will add priority update to backend in the next step.
+      if (clarificationRequest) payload.clarification_request = clarificationRequest;
+      if (assignedRangerId) payload.assigned_ranger_id = assignedRangerId;
+      if (rangerStatus) payload.ranger_status = rangerStatus;
       
-      const res = await fetch(`http://localhost:5000/api/reports/conflict/${code}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        alert("Report updated successfully!");
-        setActiveMenu('community');
-      } else {
-        alert("Failed to update report.");
-      }
+      await apiService.updateReport(code, payload);
+      alert("Report updated successfully!");
+      setActiveMenu('community');
     } catch (err) {
       alert("Error: " + err.message);
     }
@@ -266,40 +270,139 @@ export default function CLODashboard() {
                 )}
               </div>
 
-              {selectedReport.clarification_text && (
-                <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '12px', marginTop: '20px' }}>
-                  <h3 style={{ color: '#ef4444', margin: '0 0 12px 0', fontSize: '1.1rem' }}>User Clarification Details</h3>
-                  <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
-                    {selectedReport.clarification_text}
-                  </p>
-                  
-                  {selectedReport.clarification_evidence_url && (
-                    <div>
-                      <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Photo:</p>
-                      <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
-                        <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <img 
-                            src={selectedReport.clarification_evidence_url} 
-                            alt="Clarification Evidence" 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        </div>
+              {selectedReport.response_assignments && selectedReport.response_assignments.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h3 style={{ color: '#38bdf8', margin: '0 0 16px 0', fontSize: '1.1rem' }}>Ranger Assignment History</h3>
+                  {selectedReport.response_assignments.map((assignment, idx) => (
+                    <div key={assignment.id || idx} style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.9rem' }}>
+                          Assigned to: <span style={{ color: '#e2e8f0' }}>{rangers.find(r => r.id === assignment.ranger_id)?.name || assignment.ranger_id}</span>
+                        </p>
+                        <span style={{ 
+                          padding: '4px 12px', 
+                          borderRadius: '20px', 
+                          fontSize: '0.8rem', 
+                          background: assignment.status === 'PENDING' ? 'rgba(245, 158, 11, 0.2)' : 
+                                      assignment.status === 'ACCEPTED' ? 'rgba(16, 185, 129, 0.2)' : 
+                                      assignment.status === 'DECLINED' ? 'rgba(239, 68, 68, 0.2)' : 
+                                      assignment.status === 'RESPONDING' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.1)',
+                          color: assignment.status === 'PENDING' ? '#f59e0b' : 
+                                 assignment.status === 'ACCEPTED' ? '#10b981' : 
+                                 assignment.status === 'DECLINED' ? '#ef4444' : 
+                                 assignment.status === 'RESPONDING' ? '#38bdf8' : '#e2e8f0'
+                        }}>
+                          {assignment.status}
+                        </span>
                       </div>
+                      
+                      {assignment.outcome && (
+                        <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>
+                          <h4 style={{ color: '#10b981', margin: '0 0 8px 0', fontSize: '1rem' }}>Outcome Recorded</h4>
+                          <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>{assignment.outcome}</p>
+                          
+                          {assignment.outcome_image_url && (
+                            <div>
+                              <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Photo:</p>
+                              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                                <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <img 
+                                    src={assignment.outcome_image_url} 
+                                    alt="Ranger Outcome Evidence" 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
+                </div>
+              )}
+
+              {selectedReport.report_clarifications && selectedReport.report_clarifications.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h3 style={{ color: '#34d399', margin: '0 0 16px 0', fontSize: '1.1rem' }}>Clarification History</h3>
+                  {selectedReport.report_clarifications.map((clarification, idx) => (
+                    <div key={clarification.id || idx} style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
+                      <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>
+                        Officer Request ({new Date(clarification.created_at).toLocaleString()}):
+                      </p>
+                      <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+                        {clarification.officer_request}
+                      </p>
+                      
+                      {clarification.user_reply ? (
+                        <>
+                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0' }} />
+                          <p style={{ color: '#34d399', margin: '0 0 8px 0', fontSize: '0.9rem' }}>
+                            User Reply:
+                          </p>
+                          <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+                            {clarification.user_reply}
+                          </p>
+                          {clarification.evidence_url && (
+                            <div>
+                              <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Photo:</p>
+                              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                                <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <img 
+                                    src={clarification.evidence_url} 
+                                    alt="Clarification Evidence" 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p style={{ color: '#f59e0b', margin: 0, fontStyle: 'italic', fontSize: '0.9rem' }}>Waiting for user reply...</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
 
               <div style={{ display: 'flex', gap: '16px', marginTop: '32px', flexWrap: 'wrap' }}>
-                <button onClick={() => handleUpdateStatus(selectedReport.report_code, 'PENDING_INFORMATION')} className="submit-btn" style={{ width: 'auto', background: '#ef4444' }}>
+                <button onClick={() => {
+                  const reqText = prompt("Enter clarification request message for the user:");
+                  if (reqText) {
+                    handleUpdateStatus(selectedReport.report_code, 'PENDING_INFORMATION', null, reqText);
+                  }
+                }} className="submit-btn" style={{ width: 'auto', background: '#ef4444' }}>
                   Request Clarification
                 </button>
                 <button onClick={() => handleUpdateStatus(selectedReport.report_code, 'UNDER_REVIEW', 'HIGH')} className="submit-btn" style={{ width: 'auto', background: '#f59e0b' }}>
                   Set Priority HIGH & Review
                 </button>
-                <button onClick={() => handleUpdateStatus(selectedReport.report_code, 'RANGER_ASSIGNED')} className="submit-btn" style={{ width: 'auto', background: '#10b981' }}>
-                  Assign to Ranger
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <select 
+                    value={selectedRanger} 
+                    onChange={(e) => setSelectedRanger(e.target.value)}
+                    style={{ padding: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '8px', outline: 'none' }}
+                  >
+                    <option value="">-- Select Ranger --</option>
+                    {rangers.map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                  <button 
+                    onClick={() => {
+                      if (!selectedRanger) {
+                        alert('Please select a ranger first!');
+                        return;
+                      }
+                      handleUpdateStatus(selectedReport.report_code, 'RANGER_ASSIGNED', null, null, selectedRanger, 'PENDING');
+                    }} 
+                    className="submit-btn" 
+                    style={{ width: 'auto', background: '#10b981' }}
+                  >
+                    Assign Ranger
+                  </button>
+                </div>
               </div>
             </div>
           )}
