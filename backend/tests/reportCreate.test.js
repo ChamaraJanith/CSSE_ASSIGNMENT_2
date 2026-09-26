@@ -121,5 +121,192 @@ describe('Report Controller - Create & Update', () => {
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ message: 'Report updated successfully', data: { report_code: 'REP-123' } });
     });
+
+    it('should update ranger assignment status and outcome', async () => {
+      req.params = { code: 'REP-123' };
+      req.body = {
+        assignment_id: 'assign-1',
+        ranger_status: 'RESOLVED',
+        ranger_outcome: 'Chased away',
+        ranger_outcome_image: 'http://img.url'
+      };
+
+      const mockEq = jest.fn().mockResolvedValue({ error: null });
+      const mockUpdate = jest.fn().mockReturnValue({ eq: mockEq });
+
+      const mockSingle = jest.fn().mockResolvedValue({ data: { report_code: 'REP-123' }, error: null });
+      const mockEqSelect = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockSelectFetch = jest.fn().mockReturnValue({ eq: mockEqSelect });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'response_assignments') return { update: mockUpdate };
+        if (table === 'conflict_reports') return { select: mockSelectFetch }; // For final fetch
+      });
+
+      await updateReportStatus(req, res);
+
+      expect(supabaseAdmin.from).toHaveBeenCalledWith('response_assignments');
+      expect(mockUpdate).toHaveBeenCalledWith({
+        status: 'RESOLVED',
+        outcome: 'Chased away',
+        outcome_image_url: 'http://img.url'
+      });
+      expect(mockEq).toHaveBeenCalledWith('id', 'assign-1');
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it('should update ranger assignment status and outcome without photo', async () => {
+      req.params = { code: 'REP-123' };
+      req.body = {
+        assignment_id: 'assign-2',
+        ranger_status: 'RESOLVED',
+        ranger_outcome: 'Chased away safely'
+        // no ranger_outcome_image provided
+      };
+
+      const mockEq = jest.fn().mockResolvedValue({ error: null });
+      const mockUpdate = jest.fn().mockReturnValue({ eq: mockEq });
+
+      const mockSingle = jest.fn().mockResolvedValue({ data: { report_code: 'REP-123' }, error: null });
+      const mockEqSelect = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockSelectFetch = jest.fn().mockReturnValue({ eq: mockEqSelect });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'response_assignments') return { update: mockUpdate };
+        if (table === 'conflict_reports') return { select: mockSelectFetch };
+      });
+
+      await updateReportStatus(req, res);
+
+      expect(supabaseAdmin.from).toHaveBeenCalledWith('response_assignments');
+      expect(mockUpdate).toHaveBeenCalledWith({
+        status: 'RESOLVED',
+        outcome: 'Chased away safely'
+        // should not include outcome_image_url since it was undefined
+      });
+      expect(mockEq).toHaveBeenCalledWith('id', 'assign-2');
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it('should request clarification', async () => {
+      req.params = { code: 'REP-123' };
+      req.body = {
+        clarification_request: 'Need more details'
+      };
+
+      const mockInsert = jest.fn().mockResolvedValue({ error: null });
+      
+      const mockSingle = jest.fn().mockResolvedValue({ data: { report_code: 'REP-123' }, error: null });
+      const mockEqSelect = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockSelectFetch = jest.fn().mockReturnValue({ eq: mockEqSelect });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'report_clarifications') return { insert: mockInsert };
+        if (table === 'conflict_reports') return { select: mockSelectFetch };
+      });
+
+      await updateReportStatus(req, res);
+
+      expect(supabaseAdmin.from).toHaveBeenCalledWith('report_clarifications');
+      expect(mockInsert).toHaveBeenCalledWith([{
+        report_code: 'REP-123',
+        officer_request: 'Need more details'
+      }]);
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it('should reply to clarification', async () => {
+      req.params = { code: 'REP-123' };
+      req.body = {
+        clarification_id: 'clar-1',
+        clarification_reply: 'Here are details',
+        clarification_evidence_url: 'http://evidence.url'
+      };
+
+      const mockEq = jest.fn().mockResolvedValue({ error: null });
+      const mockUpdate = jest.fn().mockReturnValue({ eq: mockEq });
+
+      const mockSingle = jest.fn().mockResolvedValue({ data: { report_code: 'REP-123' }, error: null });
+      const mockEqSelect = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockSelectFetch = jest.fn().mockReturnValue({ eq: mockEqSelect });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'report_clarifications') return { update: mockUpdate };
+        if (table === 'conflict_reports') return { select: mockSelectFetch };
+      });
+
+      await updateReportStatus(req, res);
+
+      expect(supabaseAdmin.from).toHaveBeenCalledWith('report_clarifications');
+      expect(mockUpdate).toHaveBeenCalledWith({
+        user_reply: 'Here are details',
+        evidence_url: 'http://evidence.url'
+      });
+      expect(mockEq).toHaveBeenCalledWith('id', 'clar-1');
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it('should block closing a report without a ranger outcome', async () => {
+      req.params = { code: 'REP-123' };
+      req.body = { status: 'CLOSED' };
+
+      // Mock assignments check in updateReportDetails
+      const mockAssignmentsSelect = jest.fn().mockResolvedValue({ 
+        data: [{ outcome: null }, { outcome: '' }], // No valid outcome
+        error: null 
+      });
+      const mockAssignmentsEq = jest.fn().mockReturnValue({ eq: mockAssignmentsSelect }); // select().eq() -> wait, no: from().select().eq()
+      
+      const mockSelect = jest.fn().mockReturnValue({ eq: mockAssignmentsSelect });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'response_assignments') return { select: mockSelect };
+      });
+
+      await updateReportStatus(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Cannot close report without a recorded ranger outcome.' });
+    });
+
+    it('should block unauthorized ranger from updating assignment', async () => {
+      req.params = { code: 'REP-123' };
+      req.user = { id: 'user-hacker' };
+      req.body = {
+        assignment_id: 'assign-1',
+        ranger_status: 'OUTCOME_RECORDED'
+      };
+
+      // Mock assignment fetch returning a different ranger
+      const mockAssignmentSingle = jest.fn().mockResolvedValue({ 
+        data: { ranger_id: 'user-legit' }, 
+        error: null 
+      });
+      const mockAssignmentEq = jest.fn().mockReturnValue({ single: mockAssignmentSingle });
+      const mockAssignmentSelect = jest.fn().mockReturnValue({ eq: mockAssignmentEq });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'response_assignments') return { select: mockAssignmentSelect };
+      });
+
+      await updateReportStatus(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized: You can only update your own assignments.' });
+    });
+
+    it('should return error if update fails', async () => {
+      req.params = { code: 'REP-123' };
+      req.body = { status: 'CLOSED' };
+
+      supabaseAdmin.from.mockImplementation(() => {
+        throw new Error('Update failed');
+      });
+
+      await updateReportStatus(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Update failed' });
+    });
   });
 });
