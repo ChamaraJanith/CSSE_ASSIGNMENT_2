@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import {
   LayoutDashboard, Map, Info, LogOut, ShieldAlert, FileText, Camera, MapPin
 } from 'lucide-react';
+import { apiService } from '../services/api';
 import './Dashboard.css';
 
 export default function UserDashboard() {
@@ -44,16 +45,10 @@ export default function UserDashboard() {
           const { data: userData } = await supabase.auth.getUser();
           const userId = userData?.user?.id;
           
-          let url = 'http://localhost:5000/api/reports/conflict';
-          if (userId) {
-            url += `?userId=${userId}`;
-          }
+          let userIdParam = userId || null;
           
-          const res = await fetch(url);
-          if (res.ok) {
-            const result = await res.json();
-            setAllReports(result.data);
-          }
+          const result = await apiService.getAllReports(userIdParam);
+          setAllReports(result.data);
         } catch (err) {
           console.error("Failed to fetch reports", err);
         }
@@ -179,19 +174,7 @@ export default function UserDashboard() {
     console.log("Submitting Payload to Backend:", JSON.stringify(payload, null, 2));
 
     try {
-      const response = await fetch('http://localhost:5000/api/reports/conflict', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit report');
-      }
+      const data = await apiService.submitReport(payload);
 
       setReportSuccess({ 
         id: reportCode, 
@@ -331,14 +314,9 @@ export default function UserDashboard() {
                 <button onClick={() => setReportSuccess(null)} className="submit-btn" style={{ width: 'auto', padding: '12px 24px', background: '#3b82f6' }}>Submit Another Report</button>
                 <button onClick={async () => {
                   try {
-                    const res = await fetch(`http://localhost:5000/api/reports/conflict/${reportSuccess.id}`);
-                    if (res.ok) {
-                      const result = await res.json();
-                      setViewReportData(result.data);
-                      setActiveMenu('view-report');
-                    } else {
-                      alert("Failed to fetch report details");
-                    }
+                    const result = await apiService.getReportDetails(reportSuccess.id);
+                    setViewReportData(result.data);
+                    setActiveMenu('view-report');
                   } catch (err) {
                     alert("Error: " + err.message);
                   }
@@ -449,26 +427,18 @@ export default function UserDashboard() {
                           }
                         }
 
-                        const res = await fetch(`http://localhost:5000/api/reports/conflict/${viewReportData.report_code}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ 
-                            status: 'NEW', 
-                            clarification_id: viewReportData.report_clarifications?.filter(c => !c.user_reply).pop()?.id,
-                            clarification_reply: clarificationText,
-                            ...(finalEvidenceUrl && { clarification_evidence_url: finalEvidenceUrl })
-                          })
+                        await apiService.updateReport(viewReportData.report_code, { 
+                          status: 'NEW', 
+                          clarification_id: viewReportData.report_clarifications?.filter(c => !c.user_reply).pop()?.id,
+                          clarification_reply: clarificationText,
+                          ...(finalEvidenceUrl && { clarification_evidence_url: finalEvidenceUrl })
                         });
                         
-                        if (res.ok) {
-                          const result = await res.json();
-                          setViewReportData(result.data); // Update with new history from backend
-                          alert("Clarification submitted!");
-                          setClarificationText('');
-                          setClarificationFile(null);
-                        } else {
-                          alert("Failed to submit clarification.");
-                        }
+                        const result = await apiService.getReportDetails(viewReportData.report_code);
+                        setViewReportData(result.data); // Update with new history from backend
+                        alert("Clarification submitted!");
+                        setClarificationText('');
+                        setClarificationFile(null);
                       } catch (err) {
                         alert("Error: " + err.message);
                       }

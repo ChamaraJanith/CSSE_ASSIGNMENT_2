@@ -5,6 +5,7 @@ import {
   LayoutDashboard, MessageSquare, FileText,
   Settings, LogOut, ShieldAlert, Bell, MapPin
 } from 'lucide-react';
+import { apiService } from '../services/api';
 import './Dashboard.css';
 
 export default function CLODashboard() {
@@ -19,11 +20,8 @@ export default function CLODashboard() {
   React.useEffect(() => {
     const fetchRangers = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/reports/rangers');
-        if (res.ok) {
-          const result = await res.json();
-          setRangers(result.data || []);
-        }
+        const result = await apiService.getRangers();
+        setRangers(result.data || []);
       } catch (err) {
         console.error("Failed to fetch rangers", err);
       }
@@ -35,19 +33,16 @@ export default function CLODashboard() {
     if (activeMenu === 'community') {
       const fetchReports = async () => {
         try {
-          const res = await fetch('http://localhost:5000/api/reports/conflict');
-          if (res.ok) {
-            const result = await res.json();
-            // Sort: NEW status first, then by immediate_risk
-            const sorted = result.data.sort((a, b) => {
-              if (a.status === 'NEW' && b.status !== 'NEW') return -1;
-              if (b.status === 'NEW' && a.status !== 'NEW') return 1;
-              if (a.immediate_risk && !b.immediate_risk) return -1;
-              if (b.immediate_risk && !a.immediate_risk) return 1;
-              return 0;
-            });
-            setAllReports(sorted);
-          }
+          const result = await apiService.getAllReports();
+          // Sort: NEW status first, then by immediate_risk
+          const sorted = result.data.sort((a, b) => {
+            if (a.status === 'NEW' && b.status !== 'NEW') return -1;
+            if (b.status === 'NEW' && a.status !== 'NEW') return 1;
+            if (a.immediate_risk && !b.immediate_risk) return -1;
+            if (b.immediate_risk && !a.immediate_risk) return 1;
+            return 0;
+          });
+          setAllReports(sorted);
         } catch (err) {
           console.error("Failed to fetch reports", err);
         }
@@ -69,17 +64,9 @@ export default function CLODashboard() {
       if (assignedRangerId) payload.assigned_ranger_id = assignedRangerId;
       if (rangerStatus) payload.ranger_status = rangerStatus;
       
-      const res = await fetch(`http://localhost:5000/api/reports/conflict/${code}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        alert("Report updated successfully!");
-        setActiveMenu('community');
-      } else {
-        alert("Failed to update report.");
-      }
+      await apiService.updateReport(code, payload);
+      alert("Report updated successfully!");
+      setActiveMenu('community');
     } catch (err) {
       alert("Error: " + err.message);
     }

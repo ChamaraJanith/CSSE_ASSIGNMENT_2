@@ -5,6 +5,7 @@ import {
   LayoutDashboard, MapPin, AlertTriangle,
   ClipboardList, Camera, Settings, LogOut, ShieldAlert, CheckCircle
 } from 'lucide-react';
+import { apiService } from '../services/api';
 import './Dashboard.css';
 
 export default function WildlifeOfficerDashboard() {
@@ -26,11 +27,8 @@ export default function WildlifeOfficerDashboard() {
           const { data: userData } = await supabase.auth.getUser();
           if (userData?.user?.id) {
             setCurrentUserId(userData.user.id);
-            const res = await fetch(`http://localhost:5000/api/reports/conflict?rangerId=${userData.user.id}`);
-            if (res.ok) {
-              const result = await res.json();
-              setAssignedReports(result.data || []);
-            }
+            const result = await apiService.getAllReports(null, userData.user.id);
+            setAssignedReports(result.data || []);
           }
         } catch (err) {
           console.error("Failed to fetch assigned tasks", err);
@@ -46,17 +44,10 @@ export default function WildlifeOfficerDashboard() {
       if (reportStatus) payload.status = reportStatus;
       if (outcome) payload.ranger_outcome = outcome;
 
-      const res = await fetch(`http://localhost:5000/api/reports/conflict/${code}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        alert("Task updated successfully!");
-        setActiveMenu('dashboard');
-        setTimeout(() => setActiveMenu('tasks'), 100);
-      }
+      await apiService.updateReport(code, payload);
+      alert("Task updated successfully!");
+      setActiveMenu('dashboard');
+      setTimeout(() => setActiveMenu('tasks'), 100);
     } catch (err) {
       alert("Error updating task.");
     }
@@ -99,22 +90,13 @@ export default function WildlifeOfficerDashboard() {
       };
       if (imageUrl) payload.ranger_outcome_image = imageUrl;
 
-      const res = await fetch(`http://localhost:5000/api/reports/conflict/${recordingOutcomeFor.code}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        alert("Outcome recorded successfully!");
-        setRecordingOutcomeFor(null);
-        setOutcomeText('');
-        setOutcomeImage(null);
-        setActiveMenu('dashboard');
-        setTimeout(() => setActiveMenu('tasks'), 100);
-      } else {
-        alert("Failed to record outcome.");
-      }
+      await apiService.updateReport(recordingOutcomeFor.code, payload);
+      alert("Outcome recorded successfully!");
+      setRecordingOutcomeFor(null);
+      setOutcomeText('');
+      setOutcomeImage(null);
+      setActiveMenu('dashboard');
+      setTimeout(() => setActiveMenu('tasks'), 100);
     } catch (err) {
       console.error(err);
       alert("Error uploading image or recording outcome.");
