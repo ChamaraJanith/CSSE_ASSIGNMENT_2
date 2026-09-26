@@ -1,0 +1,25 @@
+{
+  "name": "csse_assignment_2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "npm run dev",
+    "dev": "concurrently \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChamaraJanith/CSSE_ASSIGNMENT_2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ChamaraJanith/CSSE_ASSIGNMENT_2/issues"
+  },
+  "homepage": "https://github.com/ChamaraJanith/CSSE_ASSIGNMENT_2#readme",
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
