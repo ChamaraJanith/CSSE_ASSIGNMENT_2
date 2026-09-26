@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-const supabase = require('./supabaseClient'); // Import Supabase client
+const { supabase, supabaseAdmin } = require('./supabaseClient'); // Import both clients
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,26 +35,34 @@ app.post('/api/wildlife-officers', async (req, res) => {
     }
 
     try {
-        // Create the user in Supabase Auth
-        const { data, error } = await supabase.auth.signUp({
+        // 1. Create the user via Admin API (no confirmation email sent, no rate limit!)
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
-            options: {
-                data: {
-                    mobile: mobileNumber,
-                    age: age,
-                    checkpoint: assignedCheckpoint,
-                    role: 'wildlife_officer'
-                },
-            },
+            email_confirm: true, // Auto-confirm, no email needed
         });
 
-        if (error) throw error;
+        if (authError) throw authError;
 
-        // NOTE: In a fully secure production app, you should use the Supabase Admin API (Service Role Key) 
-        // here to auto-insert their role into the public.user_roles table directly from the backend.
+        // 2. Insert their extra details into the specific table
+        const { error: dbError } = await supabase
+            .from('wildlife_officer_details')
+            .insert([
+                { 
+                    user_id: authData.user.id,
+                    mobile_number: mobileNumber,
+                    age: parseInt(age),
+                    assigned_checkpoint: assignedCheckpoint
+                }
+            ]);
+
+        if (dbError) {
+            console.error('Database Insert Error:', dbError.message);
+            // Non-fatal, but we should inform the client
+            return res.status(201).json({ message: 'User created, but failed to save details to table. Ensure table and policies exist.', user: authData.user });
+        }
         
-        res.status(201).json({ message: 'Wildlife Officer registered successfully', user: data.user });
+        res.status(201).json({ message: 'Wildlife Officer registered and details saved!', user: authData.user });
     } catch (error) {
         console.error('Officer Registration Error:', error.message);
         res.status(400).json({ error: error.message });
