@@ -7,6 +7,8 @@ export default function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [country, setCountry] = useState('');
+  const [city, setCity] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -22,7 +24,7 @@ export default function Register() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, country, city }),
       });
 
       const data = await response.json();
@@ -83,6 +85,40 @@ export default function Register() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '20px' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label htmlFor="country">Country</label>
+              <div className="input-wrapper">
+                <input 
+                  type="text" 
+                  id="country"
+                  className="form-input" 
+                  style={{ paddingLeft: '15px' }}
+                  placeholder="Sri Lanka" 
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ flex: 1 }}>
+              <label htmlFor="city">City</label>
+              <div className="input-wrapper">
+                <input 
+                  type="text" 
+                  id="city"
+                  className="form-input" 
+                  style={{ paddingLeft: '15px' }}
+                  placeholder="Colombo" 
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  required
+                />
+              </div>
             </div>
           </div>
 

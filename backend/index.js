@@ -15,11 +15,20 @@ app.get('/', (req, res) => {
 });
 
 app.post('/api/auth/register', async (req, res) => {
-    // ... existing register logic ...
-    const { email, password, name } = req.body;
-    if (!email || !password || !name) return res.status(400).json({ error: 'All fields are required' });
+    const { email, password, name, country, city } = req.body;
+    if (!email || !password || !name) return res.status(400).json({ error: 'Name, Email and Password are required' });
     try {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
+        const { data, error } = await supabase.auth.signUp({ 
+            email, 
+            password, 
+            options: { 
+                data: { 
+                    full_name: name,
+                    country: country,
+                    city: city
+                } 
+            } 
+        });
         if (error) throw error;
         res.status(201).json({ message: 'User created successfully', user: data.user });
     } catch (error) {
