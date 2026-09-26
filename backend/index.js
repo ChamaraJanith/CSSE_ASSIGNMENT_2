@@ -78,6 +78,9 @@ app.post('/api/wildlife-officers', async (req, res) => {
     }
 });
 
+const reportRoutes = require('./routes/reportRoutes');
+app.use('/api/reports', reportRoutes);
+
 app.listen(PORT, () => {
     console.log(`Server is running on port: ${PORT}`);
 });

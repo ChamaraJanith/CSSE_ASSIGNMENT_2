@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import {
@@ -28,6 +28,34 @@ export default function UserDashboard() {
   });
   const [loading, setLoading] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(null);
+  const [viewReportData, setViewReportData] = useState(null);
+  const [searchReportId, setSearchReportId] = useState('');
+  const [allReports, setAllReports] = useState([]);
+
+  useEffect(() => {
+    if (activeMenu === 'track-report') {
+      const fetchReports = async () => {
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          const userId = userData?.user?.id;
+          
+          let url = 'http://localhost:5000/api/reports/conflict';
+          if (userId) {
+            url += `?userId=${userId}`;
+          }
+          
+          const res = await fetch(url);
+          if (res.ok) {
+            const result = await res.json();
+            setAllReports(result.data);
+          }
+        } catch (err) {
+          console.error("Failed to fetch reports", err);
+        }
+      };
+      fetchReports();
+    }
+  }, [activeMenu]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -91,6 +119,10 @@ export default function UserDashboard() {
 
     const prefix = formData.area ? formData.area.substring(0, 4).toUpperCase() : 'WILD';
     const reportCode = `INCR-${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+    
+    // Get logged in user to attach to the report
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id || null;
 
     const payload = {
       incidentType: formData.incidentType === 'OTHER' ? formData.otherIncidentType : formData.incidentType,
@@ -113,13 +145,27 @@ export default function UserDashboard() {
       status: "NEW",
       priority: null,
       createdAt: new Date().toISOString(),
-      reportCode: reportCode
+      reportCode: reportCode,
+      user_id: userId
     };
 
     console.log("Submitting Payload to Backend:", JSON.stringify(payload, null, 2));
 
-    // Simulate backend call for now
-    setTimeout(() => {
+    try {
+      const response = await fetch('http://localhost:5000/api/reports/conflict', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit report');
+      }
+
       setReportSuccess({ 
         id: reportCode, 
         status: 'NEW', 
@@ -132,8 +178,11 @@ export default function UserDashboard() {
         incidentType: 'ELEPHANT_SIGHTING', otherIncidentType: '', description: '', incidentDate: '',
         ongoingRisk: false, area: '', landmark: '', gpsCoordinates: '', evidenceFile: null, consentGiven: false
       });
+    } catch (error) {
+      alert("Error submitting report: " + error.message);
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -153,6 +202,9 @@ export default function UserDashboard() {
           </li>
           <li className={`sidebar-item ${activeMenu === 'report' ? 'active' : ''}`} onClick={() => setActiveMenu('report')}>
             <FileText className="sidebar-item-icon" /> Report Incident
+          </li>
+          <li className={`sidebar-item ${activeMenu === 'track-report' ? 'active' : ''}`} onClick={() => { setActiveMenu('track-report'); setViewReportData(null); setSearchReportId(''); }}>
+            <ShieldAlert className="sidebar-item-icon" /> Track Report
           </li>
           <li className={`sidebar-item ${activeMenu === 'gallery' ? 'active' : ''}`} onClick={() => { setActiveMenu('gallery'); setReportSuccess(null); }}>
             <Camera className="sidebar-item-icon" /> Wildlife Gallery
@@ -250,8 +302,118 @@ export default function UserDashboard() {
               
               <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
                 <button onClick={() => setReportSuccess(null)} className="submit-btn" style={{ width: 'auto', padding: '12px 24px', background: '#3b82f6' }}>Submit Another Report</button>
-                <button onClick={() => setActiveMenu('dashboard')} className="submit-btn" style={{ width: 'auto', padding: '12px 24px', background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6' }}>View Report Status</button>
+                <button onClick={async () => {
+                  try {
+                    const res = await fetch(`http://localhost:5000/api/reports/conflict/${reportSuccess.id}`);
+                    if (res.ok) {
+                      const result = await res.json();
+                      setViewReportData(result.data);
+                      setActiveMenu('view-report');
+                    } else {
+                      alert("Failed to fetch report details");
+                    }
+                  } catch (err) {
+                    alert("Error: " + err.message);
+                  }
+                }} className="submit-btn" style={{ width: 'auto', padding: '12px 24px', background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6' }}>View Report Details</button>
               </div>
+            </div>
+          )}
+
+          {activeMenu === 'view-report' && viewReportData && (
+            <div className="dashboard-card-full" style={{ position: 'relative', zIndex: 10 }}>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2>Report Details</h2>
+                  <p>Status and information for {viewReportData.report_code}</p>
+                </div>
+                <div style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', fontWeight: 'bold' }}>
+                  {viewReportData.status}
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginTop: '20px' }}>
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px' }}>
+                  <h3 style={{ color: '#34d399', marginBottom: '16px', fontSize: '1.1rem' }}>Incident Info</h3>
+                  <p style={{ color: '#94a3b8', margin: '8px 0' }}>Type: <span style={{ color: '#e2e8f0' }}>{viewReportData.incident_type}</span></p>
+                  <p style={{ color: '#94a3b8', margin: '8px 0' }}>Date: <span style={{ color: '#e2e8f0' }}>{new Date(viewReportData.incident_datetime).toLocaleString()}</span></p>
+                  <p style={{ color: '#94a3b8', margin: '8px 0' }}>Location: <span style={{ color: '#e2e8f0' }}>{viewReportData.area} ({viewReportData.landmark})</span></p>
+                  {viewReportData.immediate_risk && <p style={{ color: '#ef4444', fontWeight: 'bold', margin: '8px 0' }}>⚠ Immediate Risk Reported</p>}
+                </div>
+                
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px' }}>
+                  <h3 style={{ color: '#34d399', marginBottom: '16px', fontSize: '1.1rem' }}>Description</h3>
+                  <p style={{ color: '#e2e8f0', lineHeight: '1.5' }}>{viewReportData.description}</p>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '24px', display: 'flex', gap: '16px' }}>
+                <button onClick={() => { setActiveMenu('dashboard'); setReportSuccess(null); }} className="submit-btn" style={{ width: 'auto', padding: '10px 20px', background: '#3b82f6' }}>Back to Home</button>
+              </div>
+            </div>
+          )}
+
+          {activeMenu === 'track-report' && (
+            <div className="dashboard-card-full" style={{ position: 'relative', zIndex: 10 }}>
+              <div className="card-header" style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <ShieldAlert size={36} color="#3b82f6" />
+                  <div>
+                    <h2>My Incident Reports</h2>
+                    <p>Track the status of your submitted reports.</p>
+                  </div>
+                </div>
+              </div>
+
+              {allReports.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', background: 'rgba(0,0,0,0.1)', borderRadius: '12px' }}>
+                  <p>No reports found. You haven't submitted any incident reports yet.</p>
+                  <button onClick={() => setActiveMenu('report')} className="submit-btn" style={{ width: 'auto', padding: '10px 20px', marginTop: '16px' }}>Submit a Report</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {allReports.map((report) => (
+                    <div key={report.id} style={{ 
+                      background: 'rgba(0,0,0,0.2)', 
+                      borderRadius: '12px', 
+                      padding: '20px', 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      border: '1px solid rgba(255,255,255,0.05)'
+                    }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                          <h3 style={{ color: '#e2e8f0', margin: 0, fontSize: '1.1rem' }}>{report.report_code}</h3>
+                          <span style={{ 
+                            padding: '4px 10px', 
+                            borderRadius: '20px', 
+                            fontSize: '0.8rem', 
+                            fontWeight: 'bold',
+                            background: report.status === 'NEW' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                            color: report.status === 'NEW' ? '#f59e0b' : '#10b981'
+                          }}>
+                            {report.status}
+                          </span>
+                        </div>
+                        <p style={{ color: '#94a3b8', margin: '0 0 4px 0', fontSize: '0.9rem' }}>{report.incident_type} • {new Date(report.incident_datetime).toLocaleDateString()}</p>
+                        <p style={{ color: '#64748b', margin: 0, fontSize: '0.85rem' }}>{report.area}</p>
+                      </div>
+                      
+                      <button 
+                        onClick={() => {
+                          setViewReportData(report);
+                          setActiveMenu('view-report');
+                        }}
+                        className="submit-btn" 
+                        style={{ width: 'auto', padding: '8px 16px', background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6' }}
+                      >
+                        View Details
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -456,7 +618,7 @@ export default function UserDashboard() {
             </div>
           )}
 
-          {activeMenu !== 'dashboard' && (
+          {activeMenu !== 'dashboard' && activeMenu !== 'report' && activeMenu !== 'track-report' && activeMenu !== 'view-report' && (
             <div className="dashboard-card-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px', color: '#94a3b8', position: 'relative', zIndex: 10 }}>
               <h3>This module is under construction.</h3>
             </div>
