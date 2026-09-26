@@ -454,13 +454,15 @@ export default function UserDashboard() {
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ 
                             status: 'NEW', 
-                            clarification_text: clarificationText,
+                            clarification_id: viewReportData.report_clarifications?.filter(c => !c.user_reply).pop()?.id,
+                            clarification_reply: clarificationText,
                             ...(finalEvidenceUrl && { clarification_evidence_url: finalEvidenceUrl })
                           })
                         });
                         
                         if (res.ok) {
-                          setViewReportData({ ...viewReportData, status: 'NEW', clarification_text: clarificationText, clarification_evidence_url: finalEvidenceUrl });
+                          const result = await res.json();
+                          setViewReportData(result.data); // Update with new history from backend
                           alert("Clarification submitted!");
                           setClarificationText('');
                           setClarificationFile(null);
@@ -515,27 +517,45 @@ export default function UserDashboard() {
                 )}
               </div>
 
-              {viewReportData.clarification_text && (
-                <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '12px', marginTop: '20px' }}>
-                  <h3 style={{ color: '#ef4444', margin: '0 0 12px 0', fontSize: '1.1rem' }}>Your Provided Clarification</h3>
-                  <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
-                    {viewReportData.clarification_text}
-                  </p>
-                  
-                  {viewReportData.clarification_evidence_url && (
-                    <div>
-                      <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Additional Photo:</p>
-                      <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
-                        <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <img 
-                            src={viewReportData.clarification_evidence_url} 
-                            alt="Clarification Evidence" 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        </div>
-                      </div>
+              {viewReportData.report_clarifications && viewReportData.report_clarifications.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h3 style={{ color: '#34d399', margin: '0 0 16px 0', fontSize: '1.1rem' }}>Clarification History</h3>
+                  {viewReportData.report_clarifications.map((clarification, idx) => (
+                    <div key={clarification.id || idx} style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
+                      <p style={{ color: '#ef4444', margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                        Officer Request ({new Date(clarification.created_at).toLocaleString()}):
+                      </p>
+                      <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+                        {clarification.officer_request}
+                      </p>
+                      
+                      {clarification.user_reply && (
+                        <>
+                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0' }} />
+                          <p style={{ color: '#34d399', margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                            Your Reply:
+                          </p>
+                          <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+                            {clarification.user_reply}
+                          </p>
+                          {clarification.evidence_url && (
+                            <div>
+                              <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Photo:</p>
+                              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                                <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <img 
+                                    src={clarification.evidence_url} 
+                                    alt="Clarification Evidence" 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
 

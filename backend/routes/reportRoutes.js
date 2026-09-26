@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { createConflictReport, getReportByCode, getAllReports, updateReportStatus } = require('../controllers/reportController');
+const { createConflictReport, getReportByCode, getAllReports, updateReportStatus, getRangers } = require('../controllers/reportController');
+
+// Route for getting all rangers
+router.get('/rangers', getRangers);
 
 // Route for getting all reports
 router.get('/conflict', getAllReports);

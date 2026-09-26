@@ -10,6 +10,118 @@ import './Dashboard.css';
 export default function WildlifeOfficerDashboard() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [assignedReports, setAssignedReports] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  
+  // State for recording outcome with image
+  const [recordingOutcomeFor, setRecordingOutcomeFor] = useState(null);
+  const [outcomeText, setOutcomeText] = useState('');
+  const [outcomeImage, setOutcomeImage] = useState(null);
+  const [isSubmittingOutcome, setIsSubmittingOutcome] = useState(false);
+
+  React.useEffect(() => {
+    if (activeMenu === 'tasks') {
+      const fetchTasks = async () => {
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData?.user?.id) {
+            setCurrentUserId(userData.user.id);
+            const res = await fetch(`http://localhost:5000/api/reports/conflict?rangerId=${userData.user.id}`);
+            if (res.ok) {
+              const result = await res.json();
+              setAssignedReports(result.data || []);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch assigned tasks", err);
+        }
+      };
+      fetchTasks();
+    }
+  }, [activeMenu]);
+
+  const handleUpdateTask = async (code, assignmentId, rangerStatus, reportStatus = null, outcome = null) => {
+    try {
+      const payload = { assignment_id: assignmentId, ranger_status: rangerStatus };
+      if (reportStatus) payload.status = reportStatus;
+      if (outcome) payload.ranger_outcome = outcome;
+
+      const res = await fetch(`http://localhost:5000/api/reports/conflict/${code}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert("Task updated successfully!");
+        setActiveMenu('dashboard');
+        setTimeout(() => setActiveMenu('tasks'), 100);
+      }
+    } catch (err) {
+      alert("Error updating task.");
+    }
+  };
+
+  const submitOutcome = async () => {
+    if (!outcomeText) {
+      alert("Please enter the outcome description.");
+      return;
+    }
+    
+    setIsSubmittingOutcome(true);
+    try {
+      let imageUrl = null;
+      if (outcomeImage) {
+        const fileExt = outcomeImage.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('evidence')
+          .upload(filePath, outcomeImage);
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from('evidence')
+          .getPublicUrl(filePath);
+
+        imageUrl = publicUrlData.publicUrl;
+      }
+
+      const payload = { 
+        assignment_id: recordingOutcomeFor.assignmentId,
+        ranger_status: 'OUTCOME_RECORDED',
+        status: 'RESOLVED',
+        ranger_outcome: outcomeText
+      };
+      if (imageUrl) payload.ranger_outcome_image = imageUrl;
+
+      const res = await fetch(`http://localhost:5000/api/reports/conflict/${recordingOutcomeFor.code}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert("Outcome recorded successfully!");
+        setRecordingOutcomeFor(null);
+        setOutcomeText('');
+        setOutcomeImage(null);
+        setActiveMenu('dashboard');
+        setTimeout(() => setActiveMenu('tasks'), 100);
+      } else {
+        alert("Failed to record outcome.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error uploading image or recording outcome.");
+    } finally {
+      setIsSubmittingOutcome(false);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -130,7 +242,104 @@ export default function WildlifeOfficerDashboard() {
             </>
           )}
 
-          {activeMenu !== 'dashboard' && (
+          {activeMenu === 'tasks' && (
+            <div className="dashboard-card-full" style={{ position: 'relative', zIndex: 10 }}>
+              <div className="card-header">
+                <h2>My Assigned Tasks</h2>
+                <p>Manage reports assigned to you by the Community Liaison Officer.</p>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
+                {assignedReports.length === 0 ? (
+                  <p style={{ color: '#94a3b8' }}>No tasks assigned currently.</p>
+                ) : (
+                  assignedReports.map(report => {
+                    // Find the most recent assignment for this ranger
+                    const assignmentsForMe = report.response_assignments?.filter(a => a.ranger_id === currentUserId) || [];
+                    const activeAssignment = assignmentsForMe[assignmentsForMe.length - 1];
+                    if (!activeAssignment) return null;
+
+                    return (
+                    <div key={report.report_code} style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '20px', borderRadius: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{report.report_code}</span>
+                        <span style={{ 
+                          padding: '4px 12px', 
+                          borderRadius: '20px', 
+                          fontSize: '0.8rem', 
+                          background: activeAssignment.status === 'PENDING' ? 'rgba(245, 158, 11, 0.2)' : 
+                                      activeAssignment.status === 'ACCEPTED' ? 'rgba(16, 185, 129, 0.2)' : 
+                                      activeAssignment.status === 'DECLINED' ? 'rgba(239, 68, 68, 0.2)' : 
+                                      activeAssignment.status === 'RESPONDING' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.1)',
+                          color: activeAssignment.status === 'PENDING' ? '#f59e0b' : 
+                                 activeAssignment.status === 'ACCEPTED' ? '#10b981' : 
+                                 activeAssignment.status === 'DECLINED' ? '#ef4444' : 
+                                 activeAssignment.status === 'RESPONDING' ? '#38bdf8' : '#e2e8f0'
+                        }}>
+                          {activeAssignment.status || 'UNKNOWN'}
+                        </span>
+                      </div>
+                      <p style={{ color: '#e2e8f0', margin: '0 0 8px 0' }}><strong>Incident:</strong> {report.incident_type}</p>
+                      <p style={{ color: '#e2e8f0', margin: '0 0 16px 0' }}><strong>Location:</strong> {report.area} — {report.landmark}</p>
+                      
+                      {activeAssignment.status === 'PENDING' && (
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <button onClick={() => handleUpdateTask(report.report_code, activeAssignment.id, 'ACCEPTED')} className="submit-btn" style={{ width: 'auto', padding: '8px 16px', background: '#10b981' }}>Acknowledge</button>
+                          <button onClick={() => handleUpdateTask(report.report_code, activeAssignment.id, 'DECLINED')} className="submit-btn" style={{ width: 'auto', padding: '8px 16px', background: '#ef4444' }}>Decline</button>
+                        </div>
+                      )}
+
+                      {activeAssignment.status === 'ACCEPTED' && (
+                        <button onClick={() => handleUpdateTask(report.report_code, activeAssignment.id, 'RESPONDING', 'RANGER_RESPONDING')} className="submit-btn" style={{ width: 'auto', padding: '8px 16px', background: '#38bdf8' }}>Mark as Responding</button>
+                      )}
+
+                      {activeAssignment.status === 'RESPONDING' && (
+                        <button onClick={() => setRecordingOutcomeFor({ code: report.report_code, assignmentId: activeAssignment.id })} className="submit-btn" style={{ width: 'auto', padding: '8px 16px', background: '#f59e0b' }}>Record Outcome</button>
+                      )}
+                    </div>
+                  )})
+                )}
+              </div>
+              
+              {/* Record Outcome Modal */}
+              {recordingOutcomeFor && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="dashboard-card-full" style={{ width: '90%', maxWidth: '500px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', zIndex: 1001, padding: '24px', borderRadius: '16px' }}>
+                    <h3 style={{ color: '#fff', marginTop: 0 }}>Record Outcome</h3>
+                    <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Report ID: {recordingOutcomeFor}</p>
+                    
+                    <div style={{ marginTop: '20px' }}>
+                      <label style={{ color: '#e2e8f0', display: 'block', marginBottom: '8px' }}>Outcome Description (Required)</label>
+                      <textarea 
+                        value={outcomeText}
+                        onChange={(e) => setOutcomeText(e.target.value)}
+                        style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: '#fff', minHeight: '100px' }}
+                        placeholder="What happened? Was the animal relocated? Any injuries?"
+                      />
+                    </div>
+
+                    <div style={{ marginTop: '20px' }}>
+                      <label style={{ color: '#e2e8f0', display: 'block', marginBottom: '8px' }}>Attach Photo (Optional)</label>
+                      <input 
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setOutcomeImage(e.target.files[0])}
+                        style={{ color: '#94a3b8' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '30px', justifyContent: 'flex-end' }}>
+                      <button onClick={() => setRecordingOutcomeFor(null)} className="submit-btn" style={{ width: 'auto', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)' }}>Cancel</button>
+                      <button onClick={submitOutcome} disabled={isSubmittingOutcome} className="submit-btn" style={{ width: 'auto', background: '#10b981' }}>
+                        {isSubmittingOutcome ? 'Saving...' : 'Save Outcome'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeMenu !== 'dashboard' && activeMenu !== 'tasks' && (
             <div className="dashboard-card-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px', color: '#94a3b8', position: 'relative', zIndex: 10 }}>
               <h3>This module is under construction.</h3>
             </div>
