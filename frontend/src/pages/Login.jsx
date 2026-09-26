@@ -1,16 +1,41 @@
 import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
 import './Login.css';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    console.log('Logging in with:', email, password);
-    // Integration with Supabase goes here
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      // For demonstration, if it's the PM account, send them to the PM dashboard
+      // In a real app, you would fetch their role from the user_roles table here!
+      if (email === 'pm@test.com' || email.startsWith('pm')) {
+        navigate('/park-manager');
+      } else {
+        alert('Logged in successfully! (Standard dashboard not yet built)');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -23,6 +48,8 @@ export default function Login() {
           <h1>Welcome back</h1>
           <p>Please enter your details to sign in.</p>
         </div>
+
+        {error && <div style={{ color: '#ef4444', textAlign: 'center', marginBottom: '10px' }}>{error}</div>}
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="form-group">
@@ -59,8 +86,8 @@ export default function Login() {
 
           <a href="#" className="forgot-password">Forgot password?</a>
 
-          <button type="submit" className="submit-btn">
-            Sign In
+          <button type="submit" className="submit-btn" disabled={loading}>
+            {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
 
