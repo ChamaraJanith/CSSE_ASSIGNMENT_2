@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import './Login.css';
 
 export default function Login() {
@@ -64,7 +65,7 @@ export default function Login() {
         </form>
 
         <div className="signup-link">
-          Don't have an account? <a href="#">Sign up</a>
+          Don't have an account? <Link to="/register">Sign up</Link>
         </div>
       </div>
     </div>
