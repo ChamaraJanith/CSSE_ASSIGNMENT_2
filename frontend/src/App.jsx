@@ -5,6 +5,7 @@ import Register from './pages/Register';
 import AdminDashboard from './pages/AdminDashboard';
 import ParkManagerDashboard from './pages/ParkManagerDashboard';
 import CLODashboard from './pages/CLODashboard';
+import WildlifeOfficerDashboard from './pages/WildlifeOfficerDashboard';
 import './index.css';
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/park-manager" element={<ParkManagerDashboard />} />
         <Route path="/clo" element={<CLODashboard />} />
+        <Route path="/wildlife-officer" element={<WildlifeOfficerDashboard />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
