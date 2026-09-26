@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const authMiddleware = require('../middleware/authMiddleware');
 const { createConflictReport, getReportByCode, getAllReports, updateReportStatus, getRangers } = require('../controllers/reportController');
+
+router.use(authMiddleware);
 
 // Route for getting all rangers
 router.get('/rangers', getRangers);

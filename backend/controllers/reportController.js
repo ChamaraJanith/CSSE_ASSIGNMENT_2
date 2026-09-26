@@ -49,8 +49,10 @@ const updateReportStatus = async (req, res) => {
             status, priority, 
             clarification_request, clarification_reply, clarification_evidence_url, clarification_id, 
             assigned_ranger_id, 
-            assignment_id, ranger_status, ranger_outcome, ranger_outcome_image 
+            assignment_id, ranger_status, ranger_outcome, ranger_outcome_image
         } = req.body;
+        
+        const requesting_user_id = req.user ? req.user.id : null;
         
         // 1. Update main report details
         const payload = {};
@@ -65,7 +67,7 @@ const updateReportStatus = async (req, res) => {
 
         // 3. Handle Ranger Outcome/Status update
         if (assignment_id && ranger_status) {
-            await reportService.updateRangerAssignment(assignment_id, ranger_status, ranger_outcome, ranger_outcome_image);
+            await reportService.updateRangerAssignment(assignment_id, ranger_status, ranger_outcome, ranger_outcome_image, requesting_user_id);
         }
 
         // 4. Handle Clarifications
@@ -81,7 +83,8 @@ const updateReportStatus = async (req, res) => {
         res.status(200).json({ message: 'Report updated successfully', data });
     } catch (error) {
         console.error('Update Status Error:', error.message);
-        res.status(400).json({ error: error.message });
+        const status = error.status || 400;
+        res.status(status).json({ error: error.message });
     }
 };
 

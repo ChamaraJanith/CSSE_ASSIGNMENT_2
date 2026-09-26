@@ -120,6 +120,23 @@ class ReportService {
 
     async updateReportDetails(code, payload) {
         if (Object.keys(payload).length > 0) {
+            // Rule: Ranger outcome එකක් නැතිව report close කිරීමට උත්සාහ කිරීම (Cannot close without outcome)
+            if (payload.status === 'CLOSED') {
+                const { data: assignments, error: fetchError } = await supabaseAdmin
+                    .from('response_assignments')
+                    .select('outcome')
+                    .eq('report_code', code);
+                
+                if (fetchError) throw fetchError;
+                
+                const hasOutcome = assignments && assignments.some(a => a.outcome && a.outcome.trim() !== '');
+                if (!hasOutcome) {
+                    const err = new Error('Cannot close report without a recorded ranger outcome.');
+                    err.status = 400;
+                    throw err;
+                }
+            }
+
             const { error } = await supabaseAdmin
                 .from('conflict_reports')
                 .update(payload)
@@ -135,7 +152,24 @@ class ReportService {
         if (error) throw error;
     }
 
-    async updateRangerAssignment(assignmentId, rangerStatus, outcome, outcomeImage) {
+    async updateRangerAssignment(assignmentId, rangerStatus, outcome, outcomeImage, requestingUserId) {
+        // Rule: තමන්ට assign නොවූ ranger කෙනෙක් acknowledge/outcome update කිරීමට උත්සාහ කිරීම Block කිරීම
+        if (requestingUserId) {
+            const { data: assignment, error: fetchError } = await supabaseAdmin
+                .from('response_assignments')
+                .select('ranger_id')
+                .eq('id', assignmentId)
+                .single();
+            
+            if (fetchError) throw fetchError;
+            
+            if (assignment.ranger_id !== requestingUserId) {
+                const err = new Error('Unauthorized: You can only update your own assignments.');
+                err.status = 403;
+                throw err;
+            }
+        }
+
         const assignmentPayload = { status: rangerStatus };
         if (outcome !== undefined) assignmentPayload.outcome = outcome;
         if (outcomeImage !== undefined) assignmentPayload.outcome_image_url = outcomeImage;

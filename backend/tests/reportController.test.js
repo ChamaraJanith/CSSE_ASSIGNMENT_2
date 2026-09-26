@@ -1,5 +1,5 @@
 const { supabaseAdmin } = require('../supabaseClient');
-const { getRangers, getAllReports, createConflictReport, getConflictReportByCode } = require('../controllers/reportController');
+const { getRangers, getAllReports, createConflictReport, getReportByCode } = require('../controllers/reportController');
 
 jest.mock('../supabaseClient', () => ({
   supabaseAdmin: {
@@ -70,6 +70,25 @@ describe('Report Controller', () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({ error: 'DB Error' });
     });
+
+    it('should return dummy rangers if empty', async () => {
+      const mockRolesSelect = jest.fn().mockReturnValue({
+        eq: jest.fn().mockResolvedValue({ data: [], error: null })
+      });
+      supabaseAdmin.from.mockReturnValue({ select: mockRolesSelect });
+
+      supabaseAdmin.auth.admin.listUsers.mockResolvedValue({ data: { users: [] }, error: null });
+
+      await getRangers(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        data: [
+          { id: '11111111-1111-1111-1111-111111111111', name: 'dummy1@wildguard.com' },
+          { id: '22222222-2222-2222-2222-222222222222', name: 'dummy2@wildguard.com' }
+        ]
+      });
+    });
   });
 
   describe('getAllReports', () => {
@@ -131,6 +150,121 @@ describe('Report Controller', () => {
           }
         ]
       });
+    });
+
+    it('should apply userId filter when userId is passed', async () => {
+      req.query = { userId: 'userA' };
+      const mockReports = [];
+      const queryObj = {
+        eq: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve({ data: mockReports, error: null }))
+      };
+      const orderObj = {
+        order: jest.fn().mockReturnValue(queryObj)
+      };
+      supabaseAdmin.from.mockReturnValue({
+        select: jest.fn().mockReturnValue(orderObj)
+      });
+      supabaseAdmin.auth.admin.listUsers.mockResolvedValue({ data: { users: [] }, error: null });
+
+      await getAllReports(req, res);
+
+      expect(queryObj.eq).toHaveBeenCalledWith('user_id', 'userA');
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+    it('should handle errors in getAllReports', async () => {
+      supabaseAdmin.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          order: jest.fn().mockReturnValue({
+            then: jest.fn((resolve, reject) => reject(new Error('Fetch failed')))
+          })
+        })
+      });
+
+      await getAllReports(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Fetch failed' });
+    });
+  });
+
+  describe('getReportByCode', () => {
+    it('should fetch a single report successfully and sort clarifications', async () => {
+      req.params = { code: 'REP-123' };
+
+      const mockSingle = jest.fn().mockResolvedValue({
+        data: { 
+          report_code: 'REP-123',
+          report_clarifications: [{ created_at: '2023-01-02' }, { created_at: '2023-01-01' }]
+        },
+        error: null
+      });
+
+      supabaseAdmin.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: mockSingle
+          })
+        })
+      });
+
+      // Mock listUsers since the service fetches users to attach emails
+      supabaseAdmin.auth.admin.listUsers.mockResolvedValue({
+        data: { users: [] },
+        error: null
+      });
+
+      await getReportByCode(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ data: { 
+        report_code: 'REP-123',
+        report_clarifications: [{ created_at: '2023-01-01' }, { created_at: '2023-01-02' }]
+      } });
+    });
+
+    it('should handle PGRST116 (not found) error explicitly', async () => {
+      req.params = { code: 'REP-123' };
+
+      const mockSingle = jest.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'JSON object requested, multiple (or no) rows returned', code: 'PGRST116' }
+      });
+
+      supabaseAdmin.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: mockSingle
+          })
+        })
+      });
+
+      await getReportByCode(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Report not found' });
+    });
+
+    it('should return error if getReportByCode fails', async () => {
+      req.params = { code: 'REP-123' };
+
+      const mockSingle = jest.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Not found', status: 404 }
+      });
+
+      supabaseAdmin.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: mockSingle
+          })
+        })
+      });
+
+      await getReportByCode(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Not found' });
     });
   });
 });

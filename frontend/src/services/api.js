@@ -1,9 +1,20 @@
+import { supabase } from '../supabaseClient';
+
 const API_BASE_URL = 'http://localhost:5000/api';
 
 class ApiService {
   async fetchWithHandleError(url, options = {}) {
     try {
-      const response = await fetch(`${API_BASE_URL}${url}`, options);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = { ...options.headers };
+      
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      
+      const updatedOptions = { ...options, headers };
+
+      const response = await fetch(`${API_BASE_URL}${url}`, updatedOptions);
       const data = await response.json();
       
       if (!response.ok) {
