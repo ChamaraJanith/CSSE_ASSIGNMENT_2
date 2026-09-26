@@ -2,8 +2,10 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import AdminDashboard from './pages/AdminDashboard';
 import ParkManagerDashboard from './pages/ParkManagerDashboard';
-import './index.css'; // Only rely on index.css and Login.css
+import CLODashboard from './pages/CLODashboard';
+import './index.css';
 
 function App() {
   return (
@@ -11,7 +13,9 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/park-manager" element={<ParkManagerDashboard />} />
+        <Route path="/clo" element={<CLODashboard />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

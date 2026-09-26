@@ -17,19 +17,34 @@ export default function Login() {
     setError(null);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      // 1. Sign in with Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      // For demonstration, if it's the PM account, send them to the PM dashboard
-      // In a real app, you would fetch their role from the user_roles table here!
-      if (email === 'pm@test.com' || email.startsWith('pm')) {
+      // 2. Fetch this user's role from the user_roles table
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('roles(role_name)')
+        .eq('user_id', data.user.id)
+        .single();
+
+      if (roleError || !roleData) {
+        throw new Error('No role assigned to this account. Contact admin.');
+      }
+
+      const role = roleData.roles.role_name;
+
+      // 3. Route to correct dashboard based on role
+      if (role === 'admin') {
+        navigate('/admin');
+      } else if (role === 'park_manager') {
         navigate('/park-manager');
+      } else if (role === 'community_liaison_officer') {
+        navigate('/clo');
+      } else if (role === 'wildlife_officer') {
+        navigate('/wildlife-officer');
       } else {
-        alert('Logged in successfully! (Standard dashboard not yet built)');
+        throw new Error('Unknown role. Contact admin.');
       }
     } catch (err) {
       setError(err.message);
