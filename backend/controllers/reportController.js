@@ -43,7 +43,6 @@ const createConflictReport = async (req, res) => {
 };
 
 const getReportByCode = async (req, res) => {
-    console.log('HIT getReportByCode:', req.params.code);
     try {
         const { code } = req.params;
         const { data, error } = await supabaseAdmin
@@ -67,7 +66,6 @@ const getReportByCode = async (req, res) => {
 };
 
 const getAllReports = async (req, res) => {
-    console.log('HIT getAllReports, query:', req.query);
     try {
         const { userId } = req.query;
         let query = supabaseAdmin.from('conflict_reports').select('*').order('created_at', { ascending: false });
@@ -87,8 +85,35 @@ const getAllReports = async (req, res) => {
     }
 };
 
+const updateReportStatus = async (req, res) => {
+    try {
+        const { code } = req.params;
+        const { status, priority, clarification_text, clarification_evidence_url } = req.body;
+        
+        const payload = {};
+        if (status) payload.status = status;
+        if (priority) payload.priority = priority;
+        if (clarification_text !== undefined) payload.clarification_text = clarification_text;
+        if (clarification_evidence_url !== undefined) payload.clarification_evidence_url = clarification_evidence_url;
+
+        const { data, error } = await supabaseAdmin
+            .from('conflict_reports')
+            .update(payload)
+            .eq('report_code', code)
+            .select();
+
+        if (error) throw error;
+        
+        res.status(200).json({ message: 'Report updated successfully', data: data[0] });
+    } catch (error) {
+        console.error('Update Status Error:', error.message);
+        res.status(400).json({ error: error.message });
+    }
+};
+
 module.exports = {
     createConflictReport,
     getReportByCode,
-    getAllReports
+    getAllReports,
+    updateReportStatus
 };

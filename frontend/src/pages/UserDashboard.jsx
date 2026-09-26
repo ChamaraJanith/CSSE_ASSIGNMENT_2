@@ -32,6 +32,11 @@ export default function UserDashboard() {
   const [searchReportId, setSearchReportId] = useState('');
   const [allReports, setAllReports] = useState([]);
 
+  // Clarification State
+  const [clarificationText, setClarificationText] = useState('');
+  const [clarificationFile, setClarificationFile] = useState(null);
+  const [submittingClarification, setSubmittingClarification] = useState(false);
+
   useEffect(() => {
     if (activeMenu === 'track-report') {
       const fetchReports = async () => {
@@ -124,6 +129,28 @@ export default function UserDashboard() {
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData?.user?.id || null;
 
+    let finalEvidenceUrl = null;
+    if (formData.evidenceFile) {
+      const fileExt = formData.evidenceFile.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('evidence')
+        .upload(fileName, formData.evidenceFile);
+        
+      if (error) {
+        alert("Error uploading image: " + error.message);
+        setLoading(false);
+        return;
+      }
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('evidence')
+        .getPublicUrl(fileName);
+        
+      finalEvidenceUrl = publicUrl;
+    }
+
     const payload = {
       incidentType: formData.incidentType === 'OTHER' ? formData.otherIncidentType : formData.incidentType,
       incidentDateTime: formData.incidentDate,
@@ -138,7 +165,7 @@ export default function UserDashboard() {
       reporterName: formData.reporterName,
       contactNumber: formData.contactNumber,
       preferredContactMethod: formData.contactMethod,
-      evidenceUrl: "simulated_upload_url_" + formData.evidenceFile.name,
+      evidenceUrl: finalEvidenceUrl,
       
       consentConfirmed: formData.consentGiven,
       
@@ -332,20 +359,185 @@ export default function UserDashboard() {
                 </div>
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginTop: '20px' }}>
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px' }}>
-                  <h3 style={{ color: '#34d399', marginBottom: '16px', fontSize: '1.1rem' }}>Incident Info</h3>
-                  <p style={{ color: '#94a3b8', margin: '8px 0' }}>Type: <span style={{ color: '#e2e8f0' }}>{viewReportData.incident_type}</span></p>
-                  <p style={{ color: '#94a3b8', margin: '8px 0' }}>Date: <span style={{ color: '#e2e8f0' }}>{new Date(viewReportData.incident_datetime).toLocaleString()}</span></p>
-                  <p style={{ color: '#94a3b8', margin: '8px 0' }}>Location: <span style={{ color: '#e2e8f0' }}>{viewReportData.area} ({viewReportData.landmark})</span></p>
-                  {viewReportData.immediate_risk && <p style={{ color: '#ef4444', fontWeight: 'bold', margin: '8px 0' }}>⚠ Immediate Risk Reported</p>}
-                </div>
-                
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px' }}>
-                  <h3 style={{ color: '#34d399', marginBottom: '16px', fontSize: '1.1rem' }}>Description</h3>
-                  <p style={{ color: '#e2e8f0', lineHeight: '1.5' }}>{viewReportData.description}</p>
+              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '24px', borderRadius: '12px', marginTop: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                  <p style={{ margin: 0, color: '#94a3b8' }}>Report ID: <span style={{ color: '#e2e8f0' }}>{viewReportData.report_code}</span></p>
+                  <p style={{ margin: 0, color: '#94a3b8' }}>Incident: <span style={{ color: '#e2e8f0' }}>{viewReportData.incident_type}</span></p>
+                  <p style={{ margin: 0, color: '#94a3b8' }}>Location: <span style={{ color: '#e2e8f0' }}>{viewReportData.area} — {viewReportData.landmark}</span></p>
+                  <p style={{ margin: 0, color: '#94a3b8' }}>Submitted: <span style={{ color: '#e2e8f0' }}>{new Date(viewReportData.incident_datetime).toLocaleString()}</span></p>
+                  <p style={{ margin: 0, color: '#94a3b8' }}>Current status: <span style={{ color: '#e2e8f0', fontWeight: 'bold' }}>{viewReportData.status}</span></p>
+                  <p style={{ margin: 0, color: '#94a3b8' }}>Priority: <span style={{ color: '#e2e8f0' }}>{viewReportData.priority || 'Awaiting officer review'}</span></p>
+                  <p style={{ margin: 0, color: '#94a3b8' }}>Last updated: <span style={{ color: '#e2e8f0' }}>{new Date(viewReportData.created_at).toLocaleString()}</span></p>
                 </div>
               </div>
+
+              {/* Timeline */}
+              <div style={{ margin: '32px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
+                {['Report Submitted', 'Under Review', 'Ranger Assigned', 'Ranger Responding', 'Resolved', 'Closed'].map((step, index) => {
+                  const statuses = ['NEW', 'UNDER_REVIEW', 'RANGER_ASSIGNED', 'RANGER_RESPONDING', 'RESOLVED', 'CLOSED'];
+                  const currentIndex = statuses.indexOf(viewReportData.status === 'PENDING_INFORMATION' ? 'NEW' : viewReportData.status);
+                  const isCompleted = index <= currentIndex;
+                  return (
+                    <div key={step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                      <div style={{ 
+                        width: '32px', height: '32px', borderRadius: '50%', 
+                        background: isCompleted ? '#10b981' : 'rgba(255,255,255,0.1)', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: isCompleted ? '#fff' : '#94a3b8', fontWeight: 'bold', marginBottom: '8px'
+                      }}>
+                        {isCompleted ? '✓' : '○'}
+                      </div>
+                      <span style={{ fontSize: '0.8rem', color: isCompleted ? '#10b981' : '#94a3b8', textAlign: 'center', maxWidth: '80px' }}>{step}</span>
+                    </div>
+                  );
+                })}
+                {/* Connecting Line */}
+                <div style={{ position: 'absolute', top: '16px', left: '20px', right: '20px', height: '2px', background: 'rgba(255,255,255,0.1)', zIndex: 0 }} />
+                <div style={{ 
+                  position: 'absolute', top: '16px', left: '20px', height: '2px', background: '#10b981', zIndex: 0,
+                  width: `${Math.max(0, (['NEW', 'UNDER_REVIEW', 'RANGER_ASSIGNED', 'RANGER_RESPONDING', 'RESOLVED', 'CLOSED'].indexOf(viewReportData.status === 'PENDING_INFORMATION' ? 'NEW' : viewReportData.status)) / 5 * 100)}%`
+                }} />
+              </div>
+
+              {/* Clarification Request UI */}
+              {viewReportData.status === 'PENDING_INFORMATION' && (
+                <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
+                  <h3 style={{ color: '#ef4444', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ShieldAlert size={20} /> More information needed
+                  </h3>
+                  <p style={{ color: '#e2e8f0', marginBottom: '16px' }}>
+                    A Community Liaison Officer has requested clarification: <strong>"Please confirm the nearest landmark or send a more accurate location."</strong>
+                  </p>
+                  
+                  <div style={{ marginTop: '16px' }}>
+                    <textarea 
+                      placeholder="Type your clarification here..."
+                      value={clarificationText}
+                      onChange={e => setClarificationText(e.target.value)}
+                      style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', marginBottom: '12px', minHeight: '80px', fontFamily: 'inherit' }}
+                    />
+                    <label style={{ display: 'block', marginBottom: '16px', color: '#e2e8f0', fontSize: '0.9rem' }}>
+                      Attach additional evidence (optional):
+                      <div style={{ marginTop: '8px' }}>
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={e => setClarificationFile(e.target.files[0])}
+                          style={{ color: '#94a3b8' }}
+                        />
+                      </div>
+                    </label>
+                    <button className="submit-btn" disabled={submittingClarification} style={{ width: 'auto', padding: '10px 20px', background: submittingClarification ? '#64748b' : '#ef4444' }} onClick={async () => {
+                      if (!clarificationText) {
+                        alert("Please provide clarification details.");
+                        return;
+                      }
+                      setSubmittingClarification(true);
+                      try {
+                        let finalEvidenceUrl = null;
+                        if (clarificationFile) {
+                          const fileExt = clarificationFile.name.split('.').pop();
+                          const fileName = `${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
+                          const { error } = await supabase.storage.from('evidence').upload(fileName, clarificationFile);
+                          if (!error) {
+                            const { data: { publicUrl } } = supabase.storage.from('evidence').getPublicUrl(fileName);
+                            finalEvidenceUrl = publicUrl;
+                          } else {
+                            alert("Error uploading image: " + error.message);
+                            setSubmittingClarification(false);
+                            return;
+                          }
+                        }
+
+                        const res = await fetch(`http://localhost:5000/api/reports/conflict/${viewReportData.report_code}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ 
+                            status: 'NEW', 
+                            clarification_text: clarificationText,
+                            ...(finalEvidenceUrl && { clarification_evidence_url: finalEvidenceUrl })
+                          })
+                        });
+                        
+                        if (res.ok) {
+                          setViewReportData({ ...viewReportData, status: 'NEW', clarification_text: clarificationText, clarification_evidence_url: finalEvidenceUrl });
+                          alert("Clarification submitted!");
+                          setClarificationText('');
+                          setClarificationFile(null);
+                        } else {
+                          alert("Failed to submit clarification.");
+                        }
+                      } catch (err) {
+                        alert("Error: " + err.message);
+                      }
+                      setSubmittingClarification(false);
+                    }}>
+                      {submittingClarification ? 'Submitting...' : 'Submit Clarification'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
+                <h3 style={{ color: '#34d399', marginBottom: '16px', fontSize: '1.1rem' }}>Description</h3>
+                <p style={{ color: '#e2e8f0', lineHeight: '1.5', margin: 0 }}>{viewReportData.description}</p>
+              </div>
+
+              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px' }}>
+                <h3 style={{ color: '#34d399', marginBottom: '16px', fontSize: '1.1rem' }}>Evidence</h3>
+                {viewReportData.evidence_url && !viewReportData.evidence_url.includes('simulated') ? (
+                  <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                    <div style={{ width: '100%', height: '250px', background: '#1e293b' }}>
+                      <img 
+                        src={viewReportData.evidence_url} 
+                        alt="Evidence" 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  </div>
+                ) : viewReportData.evidence_url && viewReportData.evidence_url.includes('simulated') ? (
+                  <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.3)', fontSize: '0.8rem', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      {viewReportData.evidence_url.replace('simulated_upload_url_', '')}
+                    </div>
+                    <div style={{ width: '100%', height: '250px', background: '#1e293b' }}>
+                      <img 
+                        src={viewReportData.incident_type === 'ELEPHANT_SIGHTING' 
+                          ? "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?q=80&w=400&auto=format&fit=crop" 
+                          : "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=400&auto=format&fit=crop"} 
+                        alt="Evidence Placeholder" 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ color: '#64748b', fontStyle: 'italic', margin: 0 }}>No evidence provided</p>
+                )}
+              </div>
+
+              {viewReportData.clarification_text && (
+                <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '12px', marginTop: '20px' }}>
+                  <h3 style={{ color: '#ef4444', margin: '0 0 12px 0', fontSize: '1.1rem' }}>Your Provided Clarification</h3>
+                  <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+                    {viewReportData.clarification_text}
+                  </p>
+                  
+                  {viewReportData.clarification_evidence_url && (
+                    <div>
+                      <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Additional Photo:</p>
+                      <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                        <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <img 
+                            src={viewReportData.clarification_evidence_url} 
+                            alt="Clarification Evidence" 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={{ marginTop: '24px', display: 'flex', gap: '16px' }}>
                 <button onClick={() => { setActiveMenu('dashboard'); setReportSuccess(null); }} className="submit-btn" style={{ width: 'auto', padding: '10px 20px', background: '#3b82f6' }}>Back to Home</button>
@@ -398,6 +590,9 @@ export default function UserDashboard() {
                         </div>
                         <p style={{ color: '#94a3b8', margin: '0 0 4px 0', fontSize: '0.9rem' }}>{report.incident_type} • {new Date(report.incident_datetime).toLocaleDateString()}</p>
                         <p style={{ color: '#64748b', margin: 0, fontSize: '0.85rem' }}>{report.area}</p>
+                        <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
+                          Priority: {report.priority ? report.priority : 'Pending review'}
+                        </p>
                       </div>
                       
                       <button 
