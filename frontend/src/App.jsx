@@ -6,6 +6,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import ParkManagerDashboard from './pages/ParkManagerDashboard';
 import CLODashboard from './pages/CLODashboard';
 import WildlifeOfficerDashboard from './pages/WildlifeOfficerDashboard';
+import UserDashboard from './pages/UserDashboard';
 import './index.css';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
         <Route path="/park-manager" element={<ParkManagerDashboard />} />
         <Route path="/clo" element={<CLODashboard />} />
         <Route path="/wildlife-officer" element={<WildlifeOfficerDashboard />} />
+        <Route path="/user" element={<UserDashboard />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

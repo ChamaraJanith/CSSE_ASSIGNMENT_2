@@ -28,15 +28,13 @@ export default function Login() {
         .eq('user_id', data.user.id)
         .single();
 
-      if (roleError || !roleData) {
-        throw new Error('No role assigned to this account. Contact admin.');
+      // If they have no special role, they are just a regular public user!
+      if (roleError || !roleData || !roleData.roles?.role_name) {
+        navigate('/user');
+        return; // Stop here, routing is complete
       }
 
-      const role = roleData.roles?.role_name;
-
-      if (!role) {
-        throw new Error('Role lookup failed. Make sure the roles table has a read policy in Supabase.');
-      }
+      const role = roleData.roles.role_name;
 
       // 3. Route to correct dashboard based on role
       if (role === 'admin') {
@@ -48,7 +46,7 @@ export default function Login() {
       } else if (role === 'wildlife_officer') {
         navigate('/wildlife-officer');
       } else {
-        throw new Error('Unknown role. Contact admin.');
+        navigate('/user'); // Fallback just in case
       }
     } catch (err) {
       setError(err.message);

@@ -11,9 +11,61 @@ export default function CLODashboard() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState('dashboard');
 
+  const [allReports, setAllReports] = useState([]);
+  const [selectedReport, setSelectedReport] = useState(null);
+  
+  React.useEffect(() => {
+    if (activeMenu === 'community') {
+      const fetchReports = async () => {
+        try {
+          const res = await fetch('http://localhost:5000/api/reports/conflict');
+          if (res.ok) {
+            const result = await res.json();
+            // Sort: NEW status first, then by immediate_risk
+            const sorted = result.data.sort((a, b) => {
+              if (a.status === 'NEW' && b.status !== 'NEW') return -1;
+              if (b.status === 'NEW' && a.status !== 'NEW') return 1;
+              if (a.immediate_risk && !b.immediate_risk) return -1;
+              if (b.immediate_risk && !a.immediate_risk) return 1;
+              return 0;
+            });
+            setAllReports(sorted);
+          }
+        } catch (err) {
+          console.error("Failed to fetch reports", err);
+        }
+      };
+      fetchReports();
+    }
+  }, [activeMenu]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
+  };
+
+  const handleUpdateStatus = async (code, newStatus, newPriority = null) => {
+    try {
+      const payload = { status: newStatus };
+      if (newPriority) payload.priority = newPriority;
+      // We need to implement PATCH priority in backend too if we want to save it, but let's assume we can patch status.
+      // Wait, let's just patch status for now, and if we need to patch priority we should add it to backend.
+      // We will add priority update to backend in the next step.
+      
+      const res = await fetch(`http://localhost:5000/api/reports/conflict/${code}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        alert("Report updated successfully!");
+        setActiveMenu('community');
+      } else {
+        alert("Failed to update report.");
+      }
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
   };
 
   return (
@@ -28,8 +80,8 @@ export default function CLODashboard() {
           <li className={`sidebar-item ${activeMenu === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveMenu('dashboard')}>
             <LayoutDashboard className="sidebar-item-icon" /> Overview
           </li>
-          <li className={`sidebar-item ${activeMenu === 'community' ? 'active' : ''}`} onClick={() => setActiveMenu('community')}>
-            <MessageSquare className="sidebar-item-icon" /> Community Reports
+          <li className={`sidebar-item ${activeMenu === 'community' || activeMenu === 'review-report' ? 'active' : ''}`} onClick={() => setActiveMenu('community')}>
+            <MessageSquare className="sidebar-item-icon" /> Conflict Report Queue
           </li>
           <li className={`sidebar-item ${activeMenu === 'incidents' ? 'active' : ''}`} onClick={() => setActiveMenu('incidents')}>
             <Bell className="sidebar-item-icon" /> Incidents
@@ -96,7 +148,163 @@ export default function CLODashboard() {
               </div>
             </>
           )}
-          {activeMenu !== 'dashboard' && (
+
+          {activeMenu === 'community' && (
+            <div className="dashboard-card-full" style={{ position: 'relative', zIndex: 10 }}>
+              <div className="card-header">
+                <h2>Conflict Report Queue</h2>
+                <p>Review and prioritize incoming incident reports from the community.</p>
+              </div>
+              
+              <div style={{ overflowX: 'auto', marginTop: '20px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', color: '#e2e8f0' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8' }}>
+                      <th style={{ padding: '12px', fontWeight: 500 }}>Report ID</th>
+                      <th style={{ padding: '12px', fontWeight: 500 }}>Incident</th>
+                      <th style={{ padding: '12px', fontWeight: 500 }}>Area</th>
+                      <th style={{ padding: '12px', fontWeight: 500 }}>Submitted</th>
+                      <th style={{ padding: '12px', fontWeight: 500 }}>Immediate danger</th>
+                      <th style={{ padding: '12px', fontWeight: 500 }}>Status</th>
+                      <th style={{ padding: '12px', fontWeight: 500 }}>View</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allReports.map(report => (
+                      <tr key={report.id} style={{ 
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        background: report.immediate_risk ? 'rgba(239, 68, 68, 0.05)' : 'transparent'
+                      }}>
+                        <td style={{ padding: '12px' }}>{report.report_code}</td>
+                        <td style={{ padding: '12px' }}>{report.incident_type}</td>
+                        <td style={{ padding: '12px' }}>{report.area}</td>
+                        <td style={{ padding: '12px' }}>{new Date(report.incident_datetime).toLocaleDateString()}</td>
+                        <td style={{ padding: '12px', color: report.immediate_risk ? '#ef4444' : '#94a3b8', fontWeight: report.immediate_risk ? 'bold' : 'normal' }}>
+                          {report.immediate_risk ? 'YES (Urgent)' : 'No'}
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <span style={{ 
+                            padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold',
+                            background: report.status === 'NEW' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                            color: report.status === 'NEW' ? '#f59e0b' : '#10b981'
+                          }}>
+                            {report.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <button onClick={() => { setSelectedReport(report); setActiveMenu('review-report'); }} className="submit-btn" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>View</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {allReports.length === 0 && (
+                      <tr><td colSpan="7" style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>No reports found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeMenu === 'review-report' && selectedReport && (
+            <div className="dashboard-card-full" style={{ position: 'relative', zIndex: 10 }}>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2>Review & Prioritise Conflict Report</h2>
+                  <p>Report ID: {selectedReport.report_code}</p>
+                </div>
+                <button onClick={() => setActiveMenu('community')} className="submit-btn" style={{ width: 'auto', background: 'transparent', border: '1px solid #94a3b8', color: '#94a3b8' }}>Back to Queue</button>
+              </div>
+
+              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px', marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div>
+                  <p style={{ color: '#94a3b8', margin: '4px 0' }}>Incident Type: <span style={{ color: '#e2e8f0' }}>{selectedReport.incident_type}</span></p>
+                  <p style={{ color: '#94a3b8', margin: '4px 0' }}>Area: <span style={{ color: '#e2e8f0' }}>{selectedReport.area}</span></p>
+                  <p style={{ color: '#94a3b8', margin: '4px 0' }}>Date: <span style={{ color: '#e2e8f0' }}>{new Date(selectedReport.incident_datetime).toLocaleString()}</span></p>
+                  <p style={{ color: '#94a3b8', margin: '4px 0' }}>Current Status: <span style={{ color: '#e2e8f0' }}>{selectedReport.status}</span></p>
+                </div>
+                <div>
+                  <p style={{ color: '#94a3b8', margin: '4px 0' }}>Reporter: <span style={{ color: '#e2e8f0' }}>{selectedReport.reporter_name}</span></p>
+                  <p style={{ color: '#94a3b8', margin: '4px 0' }}>Contact: <span style={{ color: '#e2e8f0' }}>{selectedReport.contact_number}</span></p>
+                  <p style={{ color: '#94a3b8', margin: '4px 0' }}>Immediate Risk: <span style={{ color: selectedReport.immediate_risk ? '#ef4444' : '#e2e8f0' }}>{selectedReport.immediate_risk ? 'YES' : 'NO'}</span></p>
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px', marginTop: '20px' }}>
+                <p style={{ color: '#94a3b8', margin: '0 0 8px 0' }}>Description:</p>
+                <p style={{ color: '#e2e8f0', margin: 0 }}>{selectedReport.description}</p>
+              </div>
+
+              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px', marginTop: '20px' }}>
+                <p style={{ color: '#94a3b8', margin: '0 0 12px 0' }}>Evidence:</p>
+                {selectedReport.evidence_url && !selectedReport.evidence_url.includes('simulated') ? (
+                  <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                    <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img 
+                        src={selectedReport.evidence_url} 
+                        alt="Evidence" 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  </div>
+                ) : selectedReport.evidence_url && selectedReport.evidence_url.includes('simulated') ? (
+                  <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.3)', fontSize: '0.8rem', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      {selectedReport.evidence_url.replace('simulated_upload_url_', '')}
+                    </div>
+                    <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img 
+                        src={selectedReport.incident_type === 'ELEPHANT_SIGHTING' 
+                          ? "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?q=80&w=400&auto=format&fit=crop" 
+                          : "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=400&auto=format&fit=crop"} 
+                        alt="Evidence Placeholder" 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ color: '#64748b', fontStyle: 'italic', margin: 0 }}>No evidence provided</p>
+                )}
+              </div>
+
+              {selectedReport.clarification_text && (
+                <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '12px', marginTop: '20px' }}>
+                  <h3 style={{ color: '#ef4444', margin: '0 0 12px 0', fontSize: '1.1rem' }}>User Clarification Details</h3>
+                  <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+                    {selectedReport.clarification_text}
+                  </p>
+                  
+                  {selectedReport.clarification_evidence_url && (
+                    <div>
+                      <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Photo:</p>
+                      <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                        <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <img 
+                            src={selectedReport.clarification_evidence_url} 
+                            alt="Clarification Evidence" 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '16px', marginTop: '32px', flexWrap: 'wrap' }}>
+                <button onClick={() => handleUpdateStatus(selectedReport.report_code, 'PENDING_INFORMATION')} className="submit-btn" style={{ width: 'auto', background: '#ef4444' }}>
+                  Request Clarification
+                </button>
+                <button onClick={() => handleUpdateStatus(selectedReport.report_code, 'UNDER_REVIEW', 'HIGH')} className="submit-btn" style={{ width: 'auto', background: '#f59e0b' }}>
+                  Set Priority HIGH & Review
+                </button>
+                <button onClick={() => handleUpdateStatus(selectedReport.report_code, 'RANGER_ASSIGNED')} className="submit-btn" style={{ width: 'auto', background: '#10b981' }}>
+                  Assign to Ranger
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeMenu !== 'dashboard' && activeMenu !== 'community' && activeMenu !== 'review-report' && (
             <div className="dashboard-card-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px', color: '#94a3b8', position: 'relative', zIndex: 10 }}>
               <h3>This module is under construction.</h3>
             </div>
