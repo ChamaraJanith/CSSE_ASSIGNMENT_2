@@ -517,6 +517,58 @@ export default function UserDashboard() {
                 )}
               </div>
 
+              {viewReportData.response_assignments && viewReportData.response_assignments.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h3 style={{ color: '#38bdf8', margin: '0 0 16px 0', fontSize: '1.1rem' }}>Ranger Updates</h3>
+                  {viewReportData.response_assignments.map((assignment, idx) => (
+                    <div key={assignment.id || idx} style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.9rem' }}>
+                          Assigned Ranger: <span style={{ color: '#e2e8f0', fontWeight: 'bold' }}>{assignment.ranger_email}</span>
+                        </p>
+                        <span style={{ 
+                          padding: '4px 12px', 
+                          borderRadius: '20px', 
+                          fontSize: '0.8rem', 
+                          background: assignment.status === 'PENDING' ? 'rgba(245, 158, 11, 0.2)' : 
+                                      assignment.status === 'ACCEPTED' ? 'rgba(16, 185, 129, 0.2)' : 
+                                      assignment.status === 'DECLINED' ? 'rgba(239, 68, 68, 0.2)' : 
+                                      assignment.status === 'RESPONDING' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.1)',
+                          color: assignment.status === 'PENDING' ? '#f59e0b' : 
+                                 assignment.status === 'ACCEPTED' ? '#10b981' : 
+                                 assignment.status === 'DECLINED' ? '#ef4444' : 
+                                 assignment.status === 'RESPONDING' ? '#38bdf8' : '#e2e8f0'
+                        }}>
+                          {assignment.status}
+                        </span>
+                      </div>
+                      
+                      {assignment.outcome && (
+                        <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>
+                          <h4 style={{ color: '#10b981', margin: '0 0 8px 0', fontSize: '1rem' }}>Outcome Recorded</h4>
+                          <p style={{ color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: '1.5' }}>{assignment.outcome}</p>
+                          
+                          {assignment.outcome_image_url && (
+                            <div>
+                              <p style={{ color: '#94a3b8', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Attached Photo:</p>
+                              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', maxWidth: '400px' }}>
+                                <div style={{ width: '100%', height: '250px', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <img 
+                                    src={assignment.outcome_image_url} 
+                                    alt="Ranger Outcome Evidence" 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {viewReportData.report_clarifications && viewReportData.report_clarifications.length > 0 && (
                 <div style={{ marginTop: '20px' }}>
                   <h3 style={{ color: '#34d399', margin: '0 0 16px 0', fontSize: '1.1rem' }}>Clarification History</h3>

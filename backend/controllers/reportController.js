@@ -122,6 +122,9 @@ const getAllReports = async (req, res) => {
             }
         });
         
+        // Fetch all users to map ranger_ids to emails
+        const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
+        
         let filteredData = data;
         if (rangerId) {
             // Only return reports where this ranger has an assignment
@@ -129,6 +132,16 @@ const getAllReports = async (req, res) => {
                 report.response_assignments && report.response_assignments.some(a => a.ranger_id === rangerId)
             );
         }
+
+        // Attach ranger_email to assignments
+        filteredData.forEach(report => {
+            if (report.response_assignments) {
+                report.response_assignments.forEach(assignment => {
+                    const u = users?.find(user => user.id === assignment.ranger_id);
+                    assignment.ranger_email = u ? u.email : `Unknown Ranger (${assignment.ranger_id.substring(0, 8)})`;
+                });
+            }
+        });
 
         res.status(200).json({ data: filteredData });
     } catch (error) {
