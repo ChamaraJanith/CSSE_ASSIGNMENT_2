@@ -32,7 +32,11 @@ export default function Login() {
         throw new Error('No role assigned to this account. Contact admin.');
       }
 
-      const role = roleData.roles.role_name;
+      const role = roleData.roles?.role_name;
+
+      if (!role) {
+        throw new Error('Role lookup failed. Make sure the roles table has a read policy in Supabase.');
+      }
 
       // 3. Route to correct dashboard based on role
       if (role === 'admin') {
