@@ -61,6 +61,14 @@ class ApiService {
     });
   }
 
+  async postLocationUpdate(assignmentId, latitude, longitude) {
+    return this.fetchWithHandleError(`/reports/assignments/${assignmentId}/location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude, longitude })
+    });
+  }
+
   // --- Rangers APIs ---
   async getRangers() {
     return this.fetchWithHandleError('/reports/rangers');

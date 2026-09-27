@@ -88,10 +88,30 @@ const updateReportStatus = async (req, res) => {
     }
 };
 
+const postLocationUpdate = async (req, res) => {
+    try {
+        const { assignmentId } = req.params;
+        const { latitude, longitude } = req.body;
+        const requesting_user_id = req.user ? req.user.id : null;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({ error: 'Latitude and longitude are required' });
+        }
+
+        const data = await reportService.saveLocationUpdate(assignmentId, latitude, longitude, requesting_user_id);
+        res.status(201).json({ message: 'Location saved successfully', data });
+    } catch (error) {
+        console.error('Location Update Error:', error.message);
+        const status = error.status || 400;
+        res.status(status).json({ error: error.message });
+    }
+};
+
 module.exports = {
     createConflictReport,
     getReportByCode,
     getAllReports,
     updateReportStatus,
-    getRangers
+    getRangers,
+    postLocationUpdate
 };

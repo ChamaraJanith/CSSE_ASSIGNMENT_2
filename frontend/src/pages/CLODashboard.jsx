@@ -296,6 +296,27 @@ export default function CLODashboard() {
                         </span>
                       </div>
                       
+                      {assignment.ranger_location_updates && assignment.ranger_location_updates.length > 0 && (
+                        <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '8px' }}>
+                          <h4 style={{ margin: '0 0 8px 0', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+                            <MapPin size={16} /> Live GPS Tracking (Simulated)
+                          </h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', color: '#cbd5e1', fontSize: '0.85rem' }}>
+                            {(() => {
+                              const locations = [...assignment.ranger_location_updates].sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at));
+                              const latest = locations[0];
+                              return (
+                                <>
+                                  <div><strong>Last update:</strong> {new Date(latest.recorded_at).toLocaleTimeString()}</div>
+                                  <div><strong>Location:</strong> {parseFloat(latest.latitude).toFixed(4)}, {parseFloat(latest.longitude).toFixed(4)}</div>
+                                  <div><strong>Updates received:</strong> {locations.length}</div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                      
                       {assignment.outcome && (
                         <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>
                           <h4 style={{ color: '#10b981', margin: '0 0 8px 0', fontSize: '1rem' }}>Outcome Recorded</h4>

@@ -58,7 +58,7 @@ class ReportService {
     async getReportByCode(code) {
         const { data, error } = await supabaseAdmin
             .from('conflict_reports')
-            .select('*, report_clarifications(*)')
+            .select('*, report_clarifications(*), response_assignments(*, ranger_location_updates(*))')
             .eq('report_code', code)
             .single();
 
@@ -79,7 +79,7 @@ class ReportService {
     }
 
     async getAllReports(userId, rangerId) {
-        let query = supabaseAdmin.from('conflict_reports').select('*, report_clarifications(*), response_assignments(*)').order('created_at', { ascending: false });
+        let query = supabaseAdmin.from('conflict_reports').select('*, report_clarifications(*), response_assignments(*, ranger_location_updates(*))').order('created_at', { ascending: false });
         
         if (userId) {
             query = query.eq('user_id', userId);
@@ -179,6 +179,50 @@ class ReportService {
             .update(assignmentPayload)
             .eq('id', assignmentId);
         if (error) throw error;
+    }
+
+    async saveLocationUpdate(assignmentId, latitude, longitude, requestingUserId) {
+        // Validate coordinates
+        if (isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+            const err = new Error('Invalid coordinates');
+            err.status = 400;
+            throw err;
+        }
+
+        // Fetch assignment to verify ranger and status
+        const { data: assignment, error: fetchError } = await supabaseAdmin
+            .from('response_assignments')
+            .select('ranger_id, status')
+            .eq('id', assignmentId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        if (requestingUserId && assignment.ranger_id !== requestingUserId) {
+            const err = new Error('Unauthorized: You can only simulate GPS for your own assignments.');
+            err.status = 403;
+            throw err;
+        }
+
+        if (assignment.status !== 'RESPONDING') {
+            const err = new Error('Location updates are only allowed when status is RESPONDING.');
+            err.status = 400;
+            throw err;
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('ranger_location_updates')
+            .insert([{
+                assignment_id: assignmentId,
+                ranger_id: assignment.ranger_id,
+                latitude,
+                longitude,
+                source: 'SIMULATED'
+            }])
+            .select();
+
+        if (error) throw error;
+        return data[0];
     }
 
     async requestClarification(code, officerRequest) {
