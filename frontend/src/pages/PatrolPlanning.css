@@ -1,46 +1,53 @@
 /* ==============================================================================
-   WildGuard - UC01: Plan a Risk-Based Ranger Patrol Tactical Command Styles
-   Aesthetic: High-Tech Conservation Command Center / Cyber Defense Glassmorphism
+   WildGuard - Operations Command Console Styling
+   Enterprise Conservation Architecture • Sri Lanka Department of Wildlife Conservation
+   Inspired by EarthRanger & SMART Conservation Systems
    ============================================================================== */
 
 :root {
-  --tactical-bg-dark: rgba(2, 44, 34, 0.75);
-  --tactical-card-bg: rgba(6, 78, 59, 0.35);
-  --tactical-border: rgba(52, 211, 153, 0.2);
-  --tactical-border-active: rgba(52, 211, 153, 0.6);
-  --tactical-emerald: #10b981;
-  --tactical-emerald-glow: rgba(16, 185, 129, 0.25);
-  --tactical-amber: #f59e0b;
-  --tactical-red: #ef4444;
-  --tactical-cyan: #06b6d4;
-  --tactical-text-main: #f8fafc;
-  --tactical-text-muted: #94a3b8;
+  --cmd-bg-darkest: #030a08;
+  --cmd-bg-panel: rgba(6, 26, 20, 0.7);
+  --cmd-bg-card: rgba(8, 38, 29, 0.45);
+  --cmd-border: rgba(52, 211, 153, 0.16);
+  --cmd-border-hover: rgba(52, 211, 153, 0.45);
+  --cmd-emerald: #10b981;
+  --cmd-emerald-bright: #34d399;
+  --cmd-emerald-glow: rgba(16, 185, 129, 0.25);
+  --cmd-amber: #f59e0b;
+  --cmd-red: #ef4444;
+  --cmd-cyan: #06b6d4;
+  --cmd-text-heading: #f8fafc;
+  --cmd-text-body: #cbd5e1;
+  --cmd-text-muted: #64748b;
 }
 
+/* Master Command Container */
 .patrol-console-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
   width: 100%;
-  animation: fadeIn 0.3s ease-in-out;
+  max-width: 100%;
+  box-sizing: border-box;
+  animation: consoleFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes fadeIn {
+@keyframes consoleFadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 /* --- Top Telemetry Ribbon --- */
 .telemetry-ribbon {
-  background: var(--tactical-bg-dark);
-  border: 1px solid var(--tactical-border);
-  backdrop-filter: blur(16px);
+  background: rgba(4, 20, 15, 0.85);
+  border: 1px solid var(--cmd-border);
+  backdrop-filter: blur(20px);
   border-radius: 12px;
   padding: 12px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -49,39 +56,114 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
 .pulse-indicator {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: var(--tactical-emerald);
-  box-shadow: 0 0 10px var(--tactical-emerald);
-  animation: radarPulse 1.8s infinite;
+  background: var(--cmd-emerald-bright);
+  box-shadow: 0 0 10px var(--cmd-emerald-bright);
+  animation: radarPulse 2s infinite ease-in-out;
 }
 
 @keyframes radarPulse {
   0% { transform: scale(0.9); opacity: 0.7; }
-  50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 14px var(--tactical-emerald); }
+  50% { transform: scale(1.4); opacity: 1; box-shadow: 0 0 14px var(--cmd-emerald-bright); }
   100% { transform: scale(0.9); opacity: 0.7; }
 }
 
 .pulse-indicator.warning {
-  background: var(--tactical-amber);
-  box-shadow: 0 0 10px var(--tactical-amber);
+  background: var(--cmd-amber);
+  box-shadow: 0 0 10px var(--cmd-amber);
 }
 
 .badge-defcon {
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid var(--tactical-emerald);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.4);
   color: #34d399;
   padding: 4px 10px;
   border-radius: 6px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+/* --- Integrated Stepper Header --- */
+.command-stepper-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(4, 20, 15, 0.75);
+  border: 1px solid var(--cmd-border);
+  backdrop-filter: blur(16px);
+  border-radius: 12px;
+  padding: 10px 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stepper-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.step-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cmd-text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.step-node:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.step-node.active {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.5);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.15);
+}
+
+.step-node.completed {
+  color: #a7f3d0;
+}
+
+.step-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.step-node.active .step-num {
+  background: #10b981;
+  color: #030a08;
+}
+
+.step-node.completed .step-num {
+  background: rgba(16, 185, 129, 0.3);
+  color: #34d399;
 }
 
 /* --- KPI Summary Grid --- */
@@ -89,37 +171,37 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
+  width: 100%;
 }
 
 .kpi-card {
-  background: var(--tactical-card-bg);
-  border: 1px solid var(--tactical-border);
-  backdrop-filter: blur(12px);
+  background: var(--cmd-bg-card);
+  border: 1px solid var(--cmd-border);
+  backdrop-filter: blur(14px);
   border-radius: 12px;
-  padding: 18px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .kpi-card:hover {
-  border-color: var(--tactical-emerald);
+  border-color: var(--cmd-border-hover);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .kpi-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: var(--tactical-text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
+  color: var(--cmd-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .kpi-card-value {
@@ -130,89 +212,49 @@
 }
 
 .kpi-card-sub {
-  font-size: 0.75rem;
-  color: var(--tactical-emerald);
+  font-size: 0.74rem;
+  color: var(--cmd-emerald-bright);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
-/* --- Workflow Step Navigator --- */
-.workflow-stepper {
-  display: flex;
-  align-items: center;
-  background: var(--tactical-bg-dark);
-  border: 1px solid var(--tactical-border);
-  border-radius: 12px;
-  padding: 8px 16px;
-  gap: 12px;
-  overflow-x: auto;
-}
-
-.step-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--tactical-text-muted);
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.step-chip.active {
-  background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
-  border: 1px solid var(--tactical-emerald);
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
-}
-
-.step-chip.completed {
-  color: #a7f3d0;
-}
-
-.step-arrow {
-  color: rgba(255, 255, 255, 0.2);
-}
-
-/* --- Main 2-Column Split Console --- */
+/* --- Main Split Console Layout --- */
 .console-split {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: 1fr 1fr;
   gap: 20px;
+  width: 100%;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1100px) {
   .console-split {
     grid-template-columns: 1fr;
   }
 }
 
 .panel-card {
-  background: var(--tactical-card-bg);
-  border: 1px solid var(--tactical-border);
-  backdrop-filter: blur(16px);
+  background: var(--cmd-bg-panel);
+  border: 1px solid var(--cmd-border);
+  backdrop-filter: blur(20px);
   border-radius: 14px;
   padding: 22px;
   display: flex;
   flex-direction: column;
   gap: 18px;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.3);
 }
 
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   padding-bottom: 14px;
 }
 
 .panel-title {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -220,27 +262,27 @@
   color: #fff;
 }
 
-/* --- Routes Table --- */
+/* --- Tactical Routes Table --- */
 .tactical-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
 }
 
 .tactical-table th {
   text-align: left;
   padding: 10px 14px;
-  color: var(--tactical-text-muted);
-  font-weight: 600;
+  color: var(--cmd-text-muted);
+  font-weight: 700;
   text-transform: uppercase;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .tactical-table td {
   padding: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   vertical-align: middle;
 }
 
@@ -250,12 +292,12 @@
 }
 
 .tactical-row:hover {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.08);
 }
 
 .tactical-row.selected {
-  background: rgba(16, 185, 129, 0.18);
-  border-left: 3px solid var(--tactical-emerald);
+  background: rgba(16, 185, 129, 0.16);
+  border-left: 3px solid var(--cmd-emerald);
 }
 
 .badge-risk {
@@ -264,40 +306,41 @@
   gap: 5px;
   padding: 3px 8px;
   border-radius: 6px;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .badge-risk.critical {
-  background: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.18);
   color: #fca5a5;
-  border: 1px solid var(--tactical-red);
+  border: 1px solid rgba(239, 68, 68, 0.5);
 }
 
 .badge-risk.high {
-  background: rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.18);
   color: #fde68a;
-  border: 1px solid var(--tactical-amber);
+  border: 1px solid rgba(245, 158, 11, 0.5);
 }
 
 .badge-risk.medium {
-  background: rgba(6, 182, 212, 0.2);
+  background: rgba(6, 182, 212, 0.18);
   color: #a5f3fc;
-  border: 1px solid var(--tactical-cyan);
+  border: 1px solid rgba(6, 182, 212, 0.5);
 }
 
 .badge-risk.low {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(16, 185, 129, 0.14);
   color: #6ee7b7;
-  border: 1px solid var(--tactical-emerald);
+  border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
-/* Coverage Bar */
+/* Coverage Deficit Meter */
 .progress-bar-container {
   width: 100%;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.1);
+  height: 5px;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 4px;
   overflow: hidden;
   margin-top: 4px;
@@ -309,15 +352,15 @@
   transition: width 0.3s ease;
 }
 
-/* --- Explainable AI "Why this route?" Panel --- */
+/* --- Explainable AI Breakdown Card --- */
 .explainable-card {
-  background: rgba(2, 44, 34, 0.9);
-  border: 1px solid var(--tactical-border-active);
+  background: rgba(3, 18, 14, 0.85);
+  border: 1px solid rgba(52, 211, 153, 0.25);
   border-radius: 12px;
   padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .score-metric-row {
@@ -327,7 +370,8 @@
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
-  font-size: 0.83rem;
+  font-size: 0.82rem;
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .score-badge {
@@ -339,28 +383,28 @@
   color: #34d399;
 }
 
-/* --- Schedule Conflict Warning Box --- */
+/* --- Schedule Conflict Alert Box --- */
 .conflict-box {
   background: rgba(239, 68, 68, 0.12);
-  border: 1px solid var(--tactical-red);
-  border-radius: 10px;
-  padding: 14px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 8px;
+  padding: 12px 14px;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   color: #fca5a5;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
 .conflict-icon {
-  color: var(--tactical-red);
+  color: var(--cmd-red);
   flex-shrink: 0;
   margin-top: 2px;
 }
 
-/* --- Ranger Card --- */
+/* --- Ranger Candidate Card --- */
 .ranger-card {
-  background: rgba(2, 44, 34, 0.6);
+  background: rgba(3, 18, 14, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 16px;
@@ -368,36 +412,35 @@
   flex-direction: column;
   gap: 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ranger-card:hover {
-  border-color: var(--tactical-emerald);
-  background: rgba(6, 78, 59, 0.4);
+  border-color: var(--cmd-border-hover);
+  background: rgba(6, 30, 23, 0.5);
 }
 
 .ranger-card.selected {
-  border-color: var(--tactical-emerald);
-  background: rgba(16, 185, 129, 0.15);
+  border-color: var(--cmd-emerald);
+  background: rgba(16, 185, 129, 0.14);
   box-shadow: 0 0 16px rgba(16, 185, 129, 0.2);
 }
 
 .ranger-card.locked {
-  opacity: 0.55;
-  cursor: not-allowed;
-  border-color: rgba(239, 68, 68, 0.4);
+  opacity: 0.6;
+  border-color: rgba(239, 68, 68, 0.35);
 }
 
-/* --- Action Buttons --- */
+/* --- Buttons --- */
 .btn-tactical {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 11px 20px;
-  border-radius: 10px;
+  padding: 10px 18px;
+  border-radius: 9px;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s ease;
   border: none;
@@ -405,29 +448,30 @@
 
 .btn-tactical-primary {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
 }
 
 .btn-tactical-primary:hover:not(:disabled) {
   background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
 }
 
 .btn-tactical-secondary {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: var(--tactical-text-main);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--cmd-text-heading);
 }
 
 .btn-tactical-secondary:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .btn-tactical-danger {
-  background: rgba(239, 68, 68, 0.2);
-  border: 1px solid var(--tactical-red);
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid var(--cmd-red);
   color: #fca5a5;
 }
 
@@ -436,16 +480,16 @@
   cursor: not-allowed;
 }
 
-/* --- Interactive Ranger Field Simulator Mini-Dock --- */
+/* Field Simulator Dock */
 .ranger-simulator-dock {
-  background: linear-gradient(135deg, #093327 0%, #031c15 100%);
-  border: 1px dashed var(--tactical-emerald);
+  background: linear-gradient(135deg, #06231a 0%, #02120e 100%);
+  border: 1px dashed rgba(52, 211, 153, 0.4);
   border-radius: 12px;
   padding: 16px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 15px;
+  margin-top: 14px;
   flex-wrap: wrap;
   gap: 12px;
 }
