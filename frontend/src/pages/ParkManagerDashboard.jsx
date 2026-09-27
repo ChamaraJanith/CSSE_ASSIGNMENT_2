@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { 
   Mail, Lock, Phone, Hash, MapPin, UserPlus, 
-  LayoutDashboard, Users, Settings, LogOut, ShieldAlert
+  LayoutDashboard, Users, Settings, LogOut, ShieldAlert, Compass
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import PatrolPlanningManager from '../components/patrolPlanning/PatrolPlanningManager';
 import './Login.css'; // Input styles
 import './Dashboard.css'; // Dashboard layout styles
 
 export default function ParkManagerDashboard() {
   const navigate = useNavigate();
-  const [activeMenu, setActiveMenu] = useState('add_officer');
+  const [activeMenu, setActiveMenu] = useState('patrol_planning');
   
   const [formData, setFormData] = useState({
     email: '',
@@ -69,9 +70,13 @@ export default function ParkManagerDashboard() {
         </div>
         
         <ul className="sidebar-menu">
-          <li className={`sidebar-item ${activeMenu === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveMenu('dashboard')}>
+          <li className={`sidebar-item ${activeMenu === 'patrol_planning' ? 'active' : ''}`} onClick={() => setActiveMenu('patrol_planning')}>
+            <Compass className="sidebar-item-icon" />
+            Patrol Planning (UC01)
+          </li>
+          <li className={`sidebar-item ${activeMenu === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveMenu('patrol_planning')}>
             <LayoutDashboard className="sidebar-item-icon" />
-            Dashboard
+            Overview
           </li>
           <li className={`sidebar-item ${activeMenu === 'add_officer' ? 'active' : ''}`} onClick={() => setActiveMenu('add_officer')}>
             <UserPlus className="sidebar-item-icon" />
@@ -102,7 +107,7 @@ export default function ParkManagerDashboard() {
 
         <header className="top-header">
           <div className="header-title">
-            {activeMenu === 'add_officer' ? 'Officer Management' : 'Dashboard'}
+            {activeMenu === 'patrol_planning' ? 'Risk-Based Ranger Patrol Planning (UC01)' : activeMenu === 'add_officer' ? 'Officer Management' : 'Dashboard'}
           </div>
           <div className="user-profile">
             <div className="user-info">
@@ -114,7 +119,9 @@ export default function ParkManagerDashboard() {
         </header>
 
         <div className="content-area">
-          {activeMenu === 'add_officer' ? (
+          {activeMenu === 'patrol_planning' ? (
+            <PatrolPlanningManager />
+          ) : activeMenu === 'add_officer' ? (
             <div className="dashboard-card-full" style={{ position: 'relative', zIndex: 10 }}>
               <div className="card-header">
                 <h2>Register Wildlife Officer</h2>

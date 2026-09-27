@@ -81,6 +81,10 @@ app.post('/api/wildlife-officers', async (req, res) => {
 const reportRoutes = require('./routes/reportRoutes');
 app.use('/api/reports', reportRoutes);
 
+const patrolPlanningRoutes = require('./routes/patrolPlanningRoutes');
+app.use('/api/patrol-planning', patrolPlanningRoutes);
+
+
 app.listen(PORT, () => {
     console.log(`Server is running on port: ${PORT}`);
 });
