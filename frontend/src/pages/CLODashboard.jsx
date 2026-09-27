@@ -8,6 +8,94 @@ import {
 import { apiService } from '../services/api';
 import './Dashboard.css';
 
+const LeafletMap = ({ locations, incidentLocation }) => {
+  const mapRef = React.useRef(null);
+  const mapInstance = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    if (!window.L) {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.async = true;
+      script.onload = initMap;
+      document.body.appendChild(script);
+    } else {
+      initMap();
+    }
+
+    function initMap() {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+      }
+      if (!mapRef.current || !window.L || locations.length === 0) return;
+      
+      const L = window.L;
+      const latest = locations[0];
+      const lat = Number(latest.latitude);
+      const lon = Number(latest.longitude);
+      
+      const map = L.map(mapRef.current).setView([lat, lon], 16);
+      mapInstance.current = map;
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+      
+      if (locations.length > 1) {
+        const latlngs = locations.map(loc => [Number(loc.latitude), Number(loc.longitude)]);
+        L.polyline(latlngs, {color: '#ef4444', weight: 4, opacity: 0.7}).addTo(map);
+      }
+      
+      const customIcon = L.icon({
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+      });
+
+      L.marker([lat, lon], { icon: customIcon }).addTo(map)
+        .bindPopup('<b>Latest Ranger Location</b>')
+        .openPopup();
+        
+      // Incident Location Marker
+      if (incidentLocation && incidentLocation.latitude && incidentLocation.longitude) {
+        const incLat = Number(incidentLocation.latitude);
+        const incLon = Number(incidentLocation.longitude);
+        
+        if (Number.isFinite(incLat) && Number.isFinite(incLon)) {
+          const incIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+          });
+          L.marker([incLat, incLon], { icon: incIcon }).addTo(map)
+            .bindPopup('<b>Incident Location</b>');
+        }
+      }
+    }
+    
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
+  }, [locations]);
+
+  return <div ref={mapRef} style={{ width: '100%', height: '250px', borderRadius: '8px', zIndex: 1 }}></div>;
+};
+
 export default function CLODashboard() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState('dashboard');
@@ -295,6 +383,38 @@ export default function CLODashboard() {
                           {assignment.status}
                         </span>
                       </div>
+                      
+                      {assignment.ranger_location_updates && assignment.ranger_location_updates.length > 0 && (
+                        <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '8px' }}>
+                          <h4 style={{ margin: '0 0 8px 0', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+                            <MapPin size={16} /> Live GPS Tracking (Simulated)
+                          </h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', color: '#cbd5e1', fontSize: '0.85rem' }}>
+                            {(() => {
+                              const locations = [...(assignment.ranger_location_updates ?? [])]
+                                .sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at));
+                              const latest = locations[0];
+                              if (!latest) return <div>No tracker location received yet.</div>;
+                              const lat = Number(latest.latitude);
+                              const lon = Number(latest.longitude);
+                              if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+                                return <div>Tracker location is invalid.</div>;
+                              }
+                              return (
+                                <>
+                                  <div><strong>Last update:</strong> {new Date(latest.recorded_at).toLocaleTimeString()}</div>
+                                  <div><strong>Location:</strong> {lat.toFixed(5)}, {lon.toFixed(5)}</div>
+                                  <div><strong>Updates received:</strong> {locations.length}</div>
+                                  <div><strong>Source:</strong> {latest.source ?? "Unknown"}</div>
+                                  <div style={{ gridColumn: "1 / -1", marginTop: 12 }}>
+                                    <LeafletMap locations={locations} incidentLocation={selectedReport} />
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
                       
                       {assignment.outcome && (
                         <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>

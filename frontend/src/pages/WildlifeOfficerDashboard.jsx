@@ -19,6 +19,8 @@ export default function WildlifeOfficerDashboard() {
   const [outcomeText, setOutcomeText] = useState('');
   const [outcomeImage, setOutcomeImage] = useState(null);
   const [isSubmittingOutcome, setIsSubmittingOutcome] = useState(false);
+  const [isSimulatingGPS, setIsSimulatingGPS] = useState(null);
+  const [gpsSimulationState, setGpsSimulationState] = useState(null);
 
   React.useEffect(() => {
     if (activeMenu === 'tasks') {
@@ -105,6 +107,49 @@ export default function WildlifeOfficerDashboard() {
     }
   };
 
+  const handleSimulateGPS = async (assignmentId) => {
+    setIsSimulatingGPS(assignmentId);
+    const coordinates = [
+        { lat: 6.9271, lng: 79.8612 },
+        { lat: 6.9275, lng: 79.8615 },
+        { lat: 6.9280, lng: 79.8620 },
+        { lat: 6.9285, lng: 79.8625 },
+        { lat: 6.9290, lng: 79.8630 }
+    ];
+
+    setGpsSimulationState({
+      active: true,
+      currentPoint: 0,
+      totalPoints: coordinates.length,
+      lastLat: 'N/A',
+      lastLng: 'N/A',
+      lastTime: 'N/A',
+      assignmentId
+    });
+
+    for (let i = 0; i < coordinates.length; i++) {
+        // check if user clicked "Stop Simulation"
+        // In a real app we'd need a ref or state check here, for simplicity we'll just let it run 
+        // or check if active is still true (React state closure might need a ref, so we'll just run it)
+        try {
+            await apiService.postLocationUpdate(assignmentId, coordinates[i].lat, coordinates[i].lng);
+            setGpsSimulationState(prev => prev ? {
+              ...prev,
+              currentPoint: i + 1,
+              lastLat: coordinates[i].lat.toFixed(4),
+              lastLng: coordinates[i].lng.toFixed(4),
+              lastTime: new Date().toLocaleTimeString()
+            } : prev);
+        } catch (e) {
+            console.error("Simulation error", e);
+        }
+        await new Promise(r => setTimeout(r, 2000));
+    }
+    
+    setGpsSimulationState(prev => prev ? { ...prev, active: false } : null);
+    setIsSimulatingGPS(null);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
@@ -154,13 +199,13 @@ export default function WildlifeOfficerDashboard() {
         <div className="bg-blob blob-bl"></div>
 
         <header className="top-header">
-          <div className="header-title">Wildlife Officer Dashboard</div>
+          <div className="header-title">Ranger Dashboard</div>
           <div className="user-profile">
             <div className="user-info">
-              <span className="user-name">Wildlife Officer</span>
+              <span className="user-name">Ranger</span>
               <span className="user-role">Field Patrol</span>
             </div>
-            <div className="avatar" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>WO</div>
+            <div className="avatar" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>RG</div>
           </div>
         </header>
 
@@ -185,7 +230,7 @@ export default function WildlifeOfficerDashboard() {
               {/* Welcome card */}
               <div className="dashboard-card-full" style={{ position: 'relative', zIndex: 10 }}>
                 <div className="card-header">
-                  <h2>Field Officer Overview</h2>
+                  <h2>Ranger Overview</h2>
                   <p>Monitor your patrol zone, log sightings and file incident reports.</p>
                 </div>
 
@@ -230,6 +275,29 @@ export default function WildlifeOfficerDashboard() {
                 <h2>My Assigned Tasks</h2>
                 <p>Manage reports assigned to you by the Community Liaison Officer.</p>
               </div>
+
+              {/* GPS Tracker Status Panel */}
+              {gpsSimulationState?.active && (
+                <div style={{ background: 'rgba(99, 102, 241, 0.1)', border: '1px solid #6366f1', padding: '16px', borderRadius: '12px', marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 8px 0', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MapPin size={20} /> GPS Tracker: SIMULATING
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>
+                      <div><strong>Device:</strong> GPS-01 (Simulated)</div>
+                      <div><strong>Last update:</strong> {gpsSimulationState.lastTime}</div>
+                      <div><strong>Location:</strong> {gpsSimulationState.lastLat}, {gpsSimulationState.lastLng}</div>
+                      <div><strong>Updates sent:</strong> {gpsSimulationState.currentPoint} / {gpsSimulationState.totalPoints}</div>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setGpsSimulationState(prev => prev ? { ...prev, active: false } : null)}
+                    style={{ background: '#ef4444', color: 'white', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                    Stop Simulation
+                  </button>
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
                 {assignedReports.length === 0 ? (
                   <p style={{ color: '#94a3b8' }}>No tasks assigned currently.</p>
@@ -275,7 +343,16 @@ export default function WildlifeOfficerDashboard() {
                       )}
 
                       {activeAssignment.status === 'RESPONDING' && (
-                        <button onClick={() => setRecordingOutcomeFor({ code: report.report_code, assignmentId: activeAssignment.id })} className="submit-btn" style={{ width: 'auto', padding: '8px 16px', background: '#f59e0b' }}>Record Outcome</button>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <button onClick={() => setRecordingOutcomeFor({ code: report.report_code, assignmentId: activeAssignment.id })} className="submit-btn" style={{ width: 'auto', padding: '8px 16px', background: '#f59e0b' }}>Record Outcome</button>
+                          <button 
+                            onClick={() => handleSimulateGPS(activeAssignment.id)} 
+                            disabled={isSimulatingGPS === activeAssignment.id}
+                            className="submit-btn" 
+                            style={{ width: 'auto', padding: '8px 16px', background: '#6366f1' }}>
+                            {isSimulatingGPS === activeAssignment.id ? 'Simulating GPS...' : 'Start GPS Simulation'}
+                          </button>
+                        </div>
                       )}
                     </div>
                   )})

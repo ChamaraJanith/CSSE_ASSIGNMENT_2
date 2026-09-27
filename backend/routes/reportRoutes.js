@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
-const { createConflictReport, getReportByCode, getAllReports, updateReportStatus, getRangers } = require('../controllers/reportController');
+const { createConflictReport, getReportByCode, getAllReports, updateReportStatus, getRangers, postLocationUpdate } = require('../controllers/reportController');
 
 router.use(authMiddleware);
 
@@ -19,5 +19,8 @@ router.get('/conflict/:code', getReportByCode);
 
 // Route for updating report status
 router.patch('/conflict/:code', updateReportStatus);
+
+// Route for posting simulated location updates
+router.post('/assignments/:assignmentId/location', postLocationUpdate);
 
 module.exports = router;
