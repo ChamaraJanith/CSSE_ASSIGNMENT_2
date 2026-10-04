@@ -27,4 +27,13 @@ router.patch('/plans/:id/status', patrolPlanningController.updatePlanStatus);
 // 6. Delete or Cancel Plan (Hard delete for Drafts, Soft cancel for Active plans)
 router.delete('/plans/:id', patrolPlanningController.deletePatrolPlan);
 
+// 7. Park Configuration & Telemetry Thresholds
+router.get('/settings/:parkId', patrolPlanningController.getParkSettings);
+router.put('/settings/:parkId', patrolPlanningController.updateParkSettings);
+
+// 8. Ranger Roster & Commissioning
+router.get('/rangers/park/:parkId', patrolPlanningController.getRangersByPark);
+router.post('/rangers', patrolPlanningController.registerRanger);
+router.patch('/rangers/:id/status', patrolPlanningController.updateRangerStatus);
+
 module.exports = router;
