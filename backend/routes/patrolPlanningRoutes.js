@@ -36,4 +36,10 @@ router.get('/rangers/park/:parkId', patrolPlanningController.getRangersByPark);
 router.post('/rangers', patrolPlanningController.registerRanger);
 router.patch('/rangers/:id/status', patrolPlanningController.updateRangerStatus);
 
+// 9. Dynamic Staging Posts & Park Infrastructure
+router.get('/staging-posts/:parkId', patrolPlanningController.getStagingPosts);
+router.post('/staging-posts', patrolPlanningController.createStagingPost);
+router.delete('/staging-posts/:id', patrolPlanningController.deleteStagingPost);
+
 module.exports = router;
+

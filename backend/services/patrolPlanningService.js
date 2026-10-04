@@ -243,10 +243,12 @@ class PatrolPlanningService {
       };
     });
 
-    // Sort by eligibility, no conflict, then highest match score
+    // Sort by eligibility, no conflict, highest match score, lowest workload, and closest distance
     evaluatedRangers.sort((a, b) => {
       if (a.hasScheduleConflict !== b.hasScheduleConflict) return a.hasScheduleConflict ? 1 : -1;
-      return b.matchScorePercent - a.matchScorePercent;
+      if (b.matchScorePercent !== a.matchScorePercent) return b.matchScorePercent - a.matchScorePercent;
+      if (a.active_assignments_count !== b.active_assignments_count) return a.active_assignments_count - b.active_assignments_count;
+      return a.calculatedDistanceKm - b.calculatedDistanceKm;
     });
 
     if (evaluatedRangers.length > 0 && !evaluatedRangers[0].hasScheduleConflict) {
@@ -582,6 +584,8 @@ class PatrolPlanningService {
       email,
       password,
       baseLocationName,
+      baseLat,
+      baseLng,
       certifications,
       maxActiveAssignments = 5
     } = payload;
@@ -590,13 +594,48 @@ class PatrolPlanningService {
       throw new Error('Full Name, Badge Number, and Callsign are mandatory for commissioning.');
     }
 
-    // Default staging coordinates based on park
-    const parkCoords = {
-      1: { lat: 6.3845, lng: 81.5050 }, // Yala
-      2: { lat: 8.4500, lng: 80.0500 }, // Wilpattu
-      3: { lat: 6.4700, lng: 80.8800 }  // Udawalawe
+    // Curated GPS Staging Outpost Lookup (Official DWC National Park Locations)
+    const stagingOutposts = {
+      'katagamuwa': { lat: 6.4150, lng: 81.4720 },
+      'palatupana': { lat: 6.3685, lng: 81.5190 },
+      'kumbukkan': { lat: 6.5200, lng: 81.6800 },
+      'sithulpawwa': { lat: 6.4350, lng: 81.4500 },
+      'galgamuwa': { lat: 6.4600, lng: 81.5400 },
+      'camp east': { lat: 6.3980, lng: 81.5100 },
+      'camp west': { lat: 6.3845, lng: 81.5050 },
+      'hunuwilgama': { lat: 8.4350, lng: 80.0600 },
+      'maradanmaduwa': { lat: 8.4800, lng: 80.0200 },
+      'kala oya': { lat: 8.3500, lng: 79.8500 },
+      'thanamalwila': { lat: 6.4700, lng: 80.8900 },
+      'reservoir dam': { lat: 6.4400, lng: 80.8400 }
     };
-    const baseCoords = parkCoords[assignedParkId] || { lat: 6.3845, lng: 81.5050 };
+
+    let targetLat = baseLat ? parseFloat(baseLat) : null;
+    let targetLng = baseLng ? parseFloat(baseLng) : null;
+
+    if (!targetLat || !targetLng) {
+      if (baseLocationName) {
+        const lower = baseLocationName.toLowerCase();
+        for (const [key, coords] of Object.entries(stagingOutposts)) {
+          if (lower.includes(key)) {
+            targetLat = coords.lat;
+            targetLng = coords.lng;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!targetLat || !targetLng) {
+      const parkCoords = {
+        1: { lat: 6.3845, lng: 81.5050 }, // Yala
+        2: { lat: 8.4500, lng: 80.0500 }, // Wilpattu
+        3: { lat: 6.4700, lng: 80.8800 }  // Udawalawe
+      };
+      const def = parkCoords[assignedParkId] || { lat: 6.3845, lng: 81.5050 };
+      targetLat = def.lat;
+      targetLng = def.lng;
+    }
 
     let authUserId = null;
     if (email && password) {
@@ -624,9 +663,9 @@ class PatrolPlanningService {
         callsign: callsign,
         assigned_park_id: assignedParkId,
         current_status: 'AVAILABLE',
-        current_lat: baseCoords.lat,
-        current_lng: baseCoords.lng,
-        base_location_name: baseLocationName || 'Forward Post Alpha',
+        current_lat: targetLat,
+        current_lng: targetLng,
+        base_location_name: baseLocationName || 'Katagamuwa Entrance Post',
         active_assignments_count: 0,
         max_active_assignments: parseInt(maxActiveAssignments, 10) || 5,
         is_rest_compliant: true,
@@ -677,6 +716,176 @@ class PatrolPlanningService {
     if (!timeStr) return 0;
     const parts = timeStr.split(':');
     return (parseInt(parts[0], 10) * 60) + (parseInt(parts[1], 10) || 0);
+  }
+
+  /**
+   * Get Dynamic Staging Posts & Checkpoints for a Park
+   * Fetches official persistent staging posts from database table staging_posts,
+   * counts stationed rangers, and supplements with route checkpoints.
+   */
+  async getStagingPosts(parkId = 1) {
+    const parkIdInt = parseInt(parkId, 10);
+    const postMap = new Map();
+
+    // 1. Fetch stationed personnel count per base location in this park
+    const stationedCount = {};
+    try {
+      const { data: rangers } = await supabaseAdmin
+        .from('rangers')
+        .select('base_location_name, current_status')
+        .eq('assigned_park_id', parkIdInt);
+
+      if (rangers) {
+        for (const r of rangers) {
+          if (r.base_location_name) {
+            stationedCount[r.base_location_name] = (stationedCount[r.base_location_name] || 0) + 1;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Could not query rangers for outpost personnel count:', err.message);
+    }
+
+    // 2. Fetch official commissioned staging posts from database
+    try {
+      const { data: dbPosts } = await supabaseAdmin
+        .from('staging_posts')
+        .select('*')
+        .eq('park_id', parkIdInt)
+        .order('id', { ascending: true });
+
+      if (dbPosts && dbPosts.length > 0) {
+        for (const p of dbPosts) {
+          postMap.set(p.name, {
+            id: p.id,
+            name: p.name,
+            lat: p.latitude,
+            lng: p.longitude,
+            post_type: p.post_type || 'FORWARD_OUTPOST',
+            stationed_count: stationedCount[p.name] || 0,
+            source: 'Commissioned Outpost'
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Could not query staging_posts table:', err.message);
+    }
+
+    // 3. Supplement with checkpoints from patrol_routes for this park
+    try {
+      const { data: routes } = await supabaseAdmin
+        .from('patrol_routes')
+        .select('route_name, checkpoints')
+        .eq('park_id', parkIdInt);
+
+      if (routes && routes.length > 0) {
+        for (const route of routes) {
+          if (Array.isArray(route.checkpoints)) {
+            for (const cp of route.checkpoints) {
+              if (cp.name && cp.lat && cp.lng) {
+                const cleanName = cp.name.replace(/^WP-\d+\s*/, '').trim();
+                if (!postMap.has(cleanName)) {
+                  postMap.set(cleanName, {
+                    name: cleanName,
+                    lat: cp.lat,
+                    lng: cp.lng,
+                    post_type: 'SECTOR_CHECKPOINT',
+                    stationed_count: stationedCount[cleanName] || 0,
+                    source: `Route Checkpoint (${route.route_name})`
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Could not query patrol_routes checkpoints:', err.message);
+    }
+
+    // 4. Fallback primary infrastructure if table was empty
+    const primaryGates = {
+      1: [
+        { name: 'Palatupana Headquarters (Main Gate)', lat: 6.3685, lng: 81.5190, post_type: 'MAIN_HEADQUARTERS', source: 'Primary Park Headquarters' },
+        { name: 'Katagamuwa Entrance Post (Block 1)', lat: 6.4150, lng: 81.4720, post_type: 'ENTRANCE_POST', source: 'Major Sector Gate' },
+        { name: 'Kumbukkan Oya Outpost (Riverine)', lat: 6.5200, lng: 81.6800, post_type: 'RIVERINE_OUTPOST', source: 'Riverine Border Post' },
+        { name: 'Sithulpawwa Staging Post', lat: 6.4350, lng: 81.4500, post_type: 'SANCTUARY_POST', source: 'Sanctuary Post' }
+      ],
+      2: [
+        { name: 'Hunuwilagama Base Gate', lat: 8.4100, lng: 80.0100, post_type: 'MAIN_HEADQUARTERS', source: 'Primary Park Headquarters' },
+        { name: 'Maradanmaduwa Forward Base', lat: 8.4350, lng: 80.0400, post_type: 'FORWARD_OUTPOST', source: 'Internal Station' },
+        { name: 'Kokmote River Camp', lat: 8.4850, lng: 80.0550, post_type: 'RIVERINE_OUTPOST', source: 'Riverine Camp' }
+      ],
+      3: [
+        { name: 'Park HQ Gate (Thanamalwila)', lat: 6.4350, lng: 80.8700, post_type: 'MAIN_HEADQUARTERS', source: 'Primary Park Headquarters' },
+        { name: 'Dam Crest Observation Post', lat: 6.4650, lng: 80.8650, post_type: 'FORWARD_OUTPOST', source: 'Reservoir Station' },
+        { name: 'Mau Ara Fence Post', lat: 6.4520, lng: 80.8950, post_type: 'BORDER_CHECKPOINT', source: 'Boundary Outpost' }
+      ]
+    };
+
+    const fallbackList = primaryGates[parkIdInt] || primaryGates[1];
+    for (const gate of fallbackList) {
+      if (!postMap.has(gate.name)) {
+        postMap.set(gate.name, {
+          ...gate,
+          stationed_count: stationedCount[gate.name] || 0
+        });
+      }
+    }
+
+    return Array.from(postMap.values());
+  }
+
+  /**
+   * Commission a New Staging Outpost or Checkpoint (Park Manager Authority)
+   */
+  async createStagingPost(payload) {
+    const { parkId = 1, name, latitude, longitude, postType = 'FORWARD_OUTPOST' } = payload;
+    if (!name || latitude === undefined || longitude === undefined) {
+      throw new Error('Outpost Name, Latitude, and Longitude are mandatory to establish an infrastructure post.');
+    }
+
+    const parkIdInt = parseInt(parkId, 10);
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      throw new Error('Valid numeric coordinates (Latitude and Longitude) are required.');
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('staging_posts')
+      .insert({
+        park_id: parkIdInt,
+        name: name.trim(),
+        latitude: lat,
+        longitude: lng,
+        post_type: postType || 'FORWARD_OUTPOST'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to commission outpost in database: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  /**
+   * Decommission a Staging Post
+   */
+  async deleteStagingPost(postId) {
+    const { data, error } = await supabaseAdmin
+      .from('staging_posts')
+      .delete()
+      .eq('id', postId);
+
+    if (error) {
+      throw new Error(`Failed to decommission outpost: ${error.message}`);
+    }
+
+    return { success: true, id: postId };
   }
 
   calculateDistance(lat1, lon1, lat2, lon2) {
