@@ -89,3 +89,58 @@ exports.deletePatrolPlan = async (req, res) => {
   }
 };
 
+exports.getParkSettings = async (req, res) => {
+  try {
+    const parkId = parseInt(req.params.parkId || 1, 10);
+    const settings = await patrolPlanningService.getParkSettings(parkId);
+    res.status(200).json(settings);
+  } catch (error) {
+    console.error('getParkSettings error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateParkSettings = async (req, res) => {
+  try {
+    const parkId = parseInt(req.params.parkId || 1, 10);
+    const updated = await patrolPlanningService.updateParkSettings(parkId, req.body);
+    res.status(200).json({ message: 'Park settings and telemetry thresholds updated successfully', settings: updated });
+  } catch (error) {
+    console.error('updateParkSettings error:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.registerRanger = async (req, res) => {
+  try {
+    const ranger = await patrolPlanningService.registerRanger(req.body);
+    res.status(201).json({ message: 'Ranger commissioned to active duty successfully', ranger });
+  } catch (error) {
+    console.error('registerRanger error:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.getRangersByPark = async (req, res) => {
+  try {
+    const parkId = parseInt(req.params.parkId || 1, 10);
+    const rangers = await patrolPlanningService.getRangersByPark(parkId);
+    res.status(200).json(rangers);
+  } catch (error) {
+    console.error('getRangersByPark error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateRangerStatus = async (req, res) => {
+  try {
+    const rangerId = parseInt(req.params.id, 10);
+    const { status } = req.body;
+    const updated = await patrolPlanningService.updateRangerStatus(rangerId, status);
+    res.status(200).json({ message: 'Ranger status updated successfully', ranger: updated });
+  } catch (error) {
+    console.error('updateRangerStatus error:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+

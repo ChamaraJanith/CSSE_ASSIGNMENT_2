@@ -516,6 +516,162 @@ class PatrolPlanningService {
     }
   }
 
+  /**
+   * Get Park Settings & Thresholds
+   */
+  async getParkSettings(parkId = 1) {
+    const { data, error } = await supabaseAdmin
+      .from('park_settings')
+      .select('*')
+      .eq('park_id', parkId)
+      .single();
+
+    if (error || !data) {
+      // Fallback default
+      return {
+        park_id: parkId,
+        acoustic_spike_threshold: 3,
+        max_ranger_workload: 5,
+        unmonitored_blindspot_hours: 72,
+        telemetry_interval_mins: 45,
+        target_coverage_percent: 90
+      };
+    }
+    return data;
+  }
+
+  /**
+   * Update Park Settings & Thresholds
+   */
+  async updateParkSettings(parkId, settings) {
+    const {
+      acoustic_spike_threshold,
+      max_ranger_workload,
+      unmonitored_blindspot_hours,
+      telemetry_interval_mins,
+      target_coverage_percent
+    } = settings;
+
+    const { data, error } = await supabaseAdmin
+      .from('park_settings')
+      .upsert({
+        park_id: parkId,
+        acoustic_spike_threshold: parseInt(acoustic_spike_threshold, 10) || 3,
+        max_ranger_workload: parseInt(max_ranger_workload, 10) || 5,
+        unmonitored_blindspot_hours: parseInt(unmonitored_blindspot_hours, 10) || 72,
+        telemetry_interval_mins: parseInt(telemetry_interval_mins, 10) || 45,
+        target_coverage_percent: parseInt(target_coverage_percent, 10) || 90,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'park_id' })
+      .select()
+      .single();
+
+    if (error) throw new Error(`Update settings failed: ${error.message}`);
+    return data;
+  }
+
+  /**
+   * Commission / Register New Ranger (Real Field Ranger Commissioning)
+   */
+  async registerRanger(payload) {
+    const {
+      fullName,
+      badgeNumber,
+      callsign,
+      assignedParkId = 1,
+      email,
+      password,
+      baseLocationName,
+      certifications,
+      maxActiveAssignments = 5
+    } = payload;
+
+    if (!fullName || !badgeNumber || !callsign) {
+      throw new Error('Full Name, Badge Number, and Callsign are mandatory for commissioning.');
+    }
+
+    // Default staging coordinates based on park
+    const parkCoords = {
+      1: { lat: 6.3845, lng: 81.5050 }, // Yala
+      2: { lat: 8.4500, lng: 80.0500 }, // Wilpattu
+      3: { lat: 6.4700, lng: 80.8800 }  // Udawalawe
+    };
+    const baseCoords = parkCoords[assignedParkId] || { lat: 6.3845, lng: 81.5050 };
+
+    let authUserId = null;
+    if (email && password) {
+      try {
+        const { data: authUser } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: fullName, callsign, role: 'wildlife_officer' }
+        });
+        if (authUser?.user) {
+          authUserId = authUser.user.id;
+        }
+      } catch (authErr) {
+        console.warn('Auth user creation warning (proceeding with ranger record):', authErr.message);
+      }
+    }
+
+    const { data: newRanger, error: insertErr } = await supabaseAdmin
+      .from('rangers')
+      .insert([{
+        user_id: authUserId,
+        badge_number: badgeNumber,
+        full_name: fullName,
+        callsign: callsign,
+        assigned_park_id: assignedParkId,
+        current_status: 'AVAILABLE',
+        current_lat: baseCoords.lat,
+        current_lng: baseCoords.lng,
+        base_location_name: baseLocationName || 'Forward Post Alpha',
+        active_assignments_count: 0,
+        max_active_assignments: parseInt(maxActiveAssignments, 10) || 5,
+        is_rest_compliant: true,
+        certifications: certifications || ['Riverine & Night Tracker', 'First Aid Certified'],
+        last_location_update: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (insertErr) throw new Error(`Ranger commissioning failed: ${insertErr.message}`);
+    return newRanger;
+  }
+
+  /**
+   * Update Ranger Status (Available, On Shift, Resting, etc.)
+   */
+  async updateRangerStatus(rangerId, status) {
+    const { data, error } = await supabaseAdmin
+      .from('rangers')
+      .update({
+        current_status: status,
+        last_location_update: new Date().toISOString()
+      })
+      .eq('id', rangerId)
+      .select()
+      .single();
+
+    if (error) throw new Error(`Status update failed: ${error.message}`);
+    return data;
+  }
+
+  /**
+   * Get Rangers for a Park
+   */
+  async getRangersByPark(parkId = 1) {
+    const { data, error } = await supabaseAdmin
+      .from('rangers')
+      .select('*')
+      .eq('assigned_park_id', parkId)
+      .order('id', { ascending: true });
+
+    if (error) throw new Error(`Fetch rangers failed: ${error.message}`);
+    return data;
+  }
+
   // Helper Methods
   timeToMinutes(timeStr) {
     if (!timeStr) return 0;

@@ -115,6 +115,40 @@ class ApiService {
       body: JSON.stringify({ force, reason })
     });
   }
+
+  // --- Park Settings & Thresholds ---
+  async getParkSettings(parkId = 1) {
+    return this.fetchWithHandleError(`/patrol-planning/settings/${parkId}`);
+  }
+
+  async updateParkSettings(parkId, settings) {
+    return this.fetchWithHandleError(`/patrol-planning/settings/${parkId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+  }
+
+  // --- Ranger Management ---
+  async getRangersByPark(parkId = 1) {
+    return this.fetchWithHandleError(`/patrol-planning/rangers/park/${parkId}`);
+  }
+
+  async registerRanger(payload) {
+    return this.fetchWithHandleError('/patrol-planning/rangers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async updateRangerStatus(rangerId, status) {
+    return this.fetchWithHandleError(`/patrol-planning/rangers/${rangerId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+  }
 }
 
 export const apiService = new ApiService();
