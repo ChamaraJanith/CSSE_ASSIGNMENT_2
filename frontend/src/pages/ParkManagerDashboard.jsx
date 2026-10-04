@@ -26,6 +26,94 @@ export default function ParkManagerDashboard() {
     return () => clearInterval(timer);
   }, []);
 
+  // Logged-in User Profile (real from Supabase Auth)
+  const [userProfile, setUserProfile] = useState({ 
+    name: 'Park Manager', 
+    initials: 'PM', 
+    email: '',
+    role: 'Park Operations' 
+  });
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const meta = session.user.user_metadata || {};
+          const email = session.user.email || '';
+          let displayName = meta.full_name || meta.name || '';
+          
+          if (!displayName && email) {
+            const prefix = email.split('@')[0];
+            if (prefix.toLowerCase() === 'pm' || prefix.toLowerCase() === 'park_manager' || prefix.toLowerCase() === 'parkmanager') {
+              displayName = 'Park Manager';
+            } else {
+              displayName = prefix
+                .replace(/[._-]+/g, ' ')
+                .split(' ')
+                .filter(Boolean)
+                .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                .join(' ');
+            }
+          }
+
+          if (!displayName || displayName.toLowerCase() === 'pm' || displayName.toLowerCase() === 'park_manager') {
+            displayName = 'Park Manager';
+          }
+
+          // Calculate clean 2-letter uppercase initials
+          const words = displayName.split(' ').filter(Boolean);
+          let initials = 'PM';
+          if (words.length >= 2) {
+            initials = (words[0][0] + words[1][0]).toUpperCase();
+          } else if (words.length === 1) {
+            if (words[0].toLowerCase() === 'pm') {
+              initials = 'PM';
+            } else if (words[0].length >= 2) {
+              initials = words[0].slice(0, 2).toUpperCase();
+            } else {
+              initials = words[0][0].toUpperCase();
+            }
+          }
+
+          setUserProfile({ 
+            name: displayName, 
+            initials: initials || 'PM', 
+            email,
+            role: 'Park Operations'
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load user session:', err);
+      }
+    };
+    loadUser();
+  }, []);
+
+  // Overview Tab: Real patrol dashboard data
+  const [overviewData, setOverviewData] = useState(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+
+  const currentParkId = selectedPark === 'WILP-NP' ? 2 : selectedPark === 'UDAW-NP' ? 3 : 1;
+
+  const fetchOverviewData = async () => {
+    setOverviewLoading(true);
+    try {
+      const data = await apiService.getPatrolDashboard(currentParkId);
+      setOverviewData(data);
+    } catch (err) {
+      console.error('Overview fetch error:', err);
+    } finally {
+      setOverviewLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeMenu === 'overview') {
+      fetchOverviewData();
+    }
+  }, [activeMenu, currentParkId]);
+
   // Officer Registration Form State
   const [formData, setFormData] = useState({
     email: '',
@@ -38,7 +126,6 @@ export default function ParkManagerDashboard() {
   const [message, setMessage] = useState(null);
 
   // Officers List State
-  const currentParkId = selectedPark === 'WILP-NP' ? 2 : selectedPark === 'UDAW-NP' ? 3 : 1;
   const [officers, setOfficers] = useState([]);
   const [loadingOfficers, setLoadingOfficers] = useState(false);
 
@@ -171,7 +258,7 @@ export default function ParkManagerDashboard() {
         <div className="sidebar-footer">
           <div className="logout-btn" onClick={handleLogout}>
             <LogOut size={18} />
-            <span>Sign Out Command</span>
+            <span>Sign Out</span>
           </div>
         </div>
       </aside>
@@ -181,7 +268,7 @@ export default function ParkManagerDashboard() {
         <header className="top-header">
           <div>
             <div className="header-title">
-              {activeMenu === 'patrol_planning' ? 'Tactical Patrol Planning & Dispatch' :
+              {activeMenu === 'patrol_planning' ? 'Patrol Planning & Ranger Dispatch' :
                activeMenu === 'overview' ? 'National Park Operations Command Center' :
                activeMenu === 'view_officers' ? 'Field Ranger Personnel & Deployment Roster' :
                activeMenu === 'add_officer' ? 'New Wildlife Officer Registration' :
@@ -215,10 +302,10 @@ export default function ParkManagerDashboard() {
 
             {/* User Profile */}
             <div className="user-profile">
-              <div className="avatar">CW</div>
+              <div className="avatar">{userProfile.initials}</div>
               <div className="user-info">
-                <span className="user-name">Chief Warden / Park Manager</span>
-                <span className="user-role">Tactical Command Authority</span>
+                <span className="user-name">{userProfile.name}</span>
+                <span className="user-role">{userProfile.role || 'Park Operations'}</span>
               </div>
             </div>
           </div>
@@ -233,89 +320,116 @@ export default function ParkManagerDashboard() {
           {/* 2. Operations Overview Screen */}
           {activeMenu === 'overview' && (
             <div className="patrol-console-container">
-              <div className="kpi-grid">
-                <div className="kpi-card">
-                  <div className="kpi-card-header">
-                    <span>Protected Area</span>
-                    <span style={{ color: '#34d399' }}>
-                      {currentParkId === 2 ? 'SECTOR 3' : currentParkId === 3 ? 'SECTOR 2' : 'SECTOR 7'}
-                    </span>
-                  </div>
-                  <div className="kpi-card-value">
-                    {currentParkId === 2 ? '1,317.0 km²' : currentParkId === 3 ? '308.2 km²' : '978.8 km²'}
-                  </div>
-                  <div className="kpi-card-sub">
-                    {currentParkId === 2 ? 'Wilpattu National Park (North-Western)' : currentParkId === 3 ? 'Udawalawe National Park (Reservoir)' : 'Yala National Park (Ruhuna)'}
-                  </div>
+              {overviewLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#34d399', gap: 12 }}>
+                  <RefreshCw size={28} className="animate-spin" />
+                  <span style={{ fontWeight: 600 }}>Loading Operational Data...</span>
                 </div>
+              ) : (
+                <>
+                  <div className="kpi-grid">
+                    <div className="kpi-card">
+                      <div className="kpi-card-header">
+                        <span>Protected Area</span>
+                        <span style={{ color: '#34d399' }}>COVERAGE</span>
+                      </div>
+                      <div className="kpi-card-value">
+                        {overviewData?.park?.total_area_sqkm ? `${overviewData.park.total_area_sqkm.toLocaleString()} km²` : '—'}
+                      </div>
+                      <div className="kpi-card-sub">{overviewData?.park?.name || '—'}</div>
+                    </div>
 
-                <div className="kpi-card">
-                  <div className="kpi-card-header">
-                    <span>Active Patrol Units</span>
-                    <span style={{ color: '#34d399' }}>ON-DUTY</span>
-                  </div>
-                  <div className="kpi-card-value">{currentParkId === 2 ? '2 Teams' : currentParkId === 3 ? '2 Teams' : '4 Teams'}</div>
-                  <div className="kpi-card-sub">Rangers Assigned &amp; Deployed</div>
-                </div>
+                    <div className="kpi-card">
+                      <div className="kpi-card-header">
+                        <span>Active Patrol Units</span>
+                        <span style={{ color: '#34d399' }}>ON-DUTY</span>
+                      </div>
+                      <div className="kpi-card-value">{overviewData?.kpi?.activeRangersDeployed || '0/0 Active'}</div>
+                      <div className="kpi-card-sub">{overviewData?.kpi?.standbyUnitsCount ?? 0} Units on Standby</div>
+                    </div>
 
-                <div className="kpi-card">
-                  <div className="kpi-card-header">
-                    <span>Active Threat Zones</span>
-                    <span style={{ color: '#ef4444' }}>CRITICAL</span>
-                  </div>
-                  <div className="kpi-card-value">{currentParkId === 3 ? '1 Hotspot' : '2 Hotspots'}</div>
-                  <div className="kpi-card-sub" style={{ color: '#f87171' }}>Acoustic Spikes Detected</div>
-                </div>
+                    <div className="kpi-card">
+                      <div className="kpi-card-header">
+                        <span>Critical Blindspot Zones</span>
+                        <span style={{ color: '#ef4444' }}>URGENT</span>
+                      </div>
+                      <div className="kpi-card-value">
+                        {overviewData?.kpi?.blindspotZonesCount ?? '—'} {overviewData?.kpi?.blindspotZonesCount === 1 ? 'Zone' : 'Zones'}
+                      </div>
+                      <div className="kpi-card-sub" style={{ color: '#f87171' }}>Acoustic Spikes: {overviewData?.kpi?.acousticSpikesLast24h ?? 0} in 24h</div>
+                    </div>
 
-                <div className="kpi-card">
-                  <div className="kpi-card-header">
-                    <span>Tripwire Grid Status</span>
-                    <span style={{ color: '#34d399' }}>LIVE</span>
-                  </div>
-                  <div className="kpi-card-value">99.4%</div>
-                  <div className="kpi-card-sub">Sensors Communicating</div>
-                </div>
-              </div>
-
-              <div className="console-split">
-                <div className="panel-card">
-                  <div className="panel-header">
-                    <div className="panel-title">
-                      <Compass size={18} color="#34d399" />
-                      <span>Live Tactical Map &amp; Risk Zones</span>
+                    <div className="kpi-card">
+                      <div className="kpi-card-header">
+                        <span>Risk Coverage Index</span>
+                        <span style={{ color: '#34d399' }}>LIVE</span>
+                      </div>
+                      <div className="kpi-card-value">{overviewData?.kpi?.riskCoverageIndex || '—'}</div>
+                      <div className="kpi-card-sub">Sensor Grid Active</div>
                     </div>
                   </div>
-                  <TacticalMap />
-                </div>
 
-                <div className="panel-card">
-                  <div className="panel-header">
-                    <div className="panel-title">
-                      <AlertTriangle size={18} color="#f59e0b" />
-                      <span>Immediate Tactical Recommendation</span>
+                  <div className="console-split">
+                    <div className="panel-card">
+                      <div className="panel-header">
+                        <div className="panel-title">
+                          <Compass size={18} color="#34d399" />
+                          <span>Live Tactical Map &amp; Risk Zones</span>
+                        </div>
+                        <button
+                          onClick={fetchOverviewData}
+                          style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}
+                        >
+                          <RefreshCw size={13} /> Refresh
+                        </button>
+                      </div>
+                      <TacticalMap park={overviewData?.park} />
                     </div>
-                    <span className="badge-defcon">URGENT</span>
-                  </div>
 
-                  <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid #ef4444', borderRadius: 10, padding: 16 }}>
-                    <div style={{ color: '#fca5a5', fontWeight: 700, fontSize: '0.95rem' }}>
-                      {currentParkId === 2 ? 'Sector 3 - Kokmote River Corridor Requires Priority Patrol' : currentParkId === 3 ? 'Sector 2 - Mau Ara Southern Fence Corridor Requires Priority Patrol' : 'Sector 7B - Northern River Basin Requires Immediate Patrol'}
+                    <div className="panel-card">
+                      <div className="panel-header">
+                        <div className="panel-title">
+                          <AlertTriangle size={18} color="#f59e0b" />
+                          <span>Priority Tactical Recommendation</span>
+                        </div>
+                        <span className="badge-defcon">URGENT</span>
+                      </div>
+
+                      {overviewData?.topRecommendedRoute ? (
+                        <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid #ef4444', borderRadius: 10, padding: 16 }}>
+                          <div style={{ color: '#fca5a5', fontWeight: 700, fontSize: '0.95rem' }}>
+                            {overviewData.topRecommendedRoute.route_name} Requires Priority Patrol
+                          </div>
+                          <p style={{ margin: '6px 0 0', color: '#cbd5e1', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                            {overviewData.topRecommendedRoute.coverage_gap_percent}% coverage deficit •
+                            {' '}{overviewData.topRecommendedRoute.recent_incident_count} recent incident{overviewData.topRecommendedRoute.recent_incident_count !== 1 ? 's' : ''} •
+                            {' '}{overviewData.topRecommendedRoute.base_risk_level} risk level.
+                          </p>
+                          <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                              Threat Score: <strong style={{ color: '#34d399' }}>{overviewData.topRecommendedRoute.threatScore} / 10</strong>
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                              Terrain: <strong style={{ color: '#fff' }}>{overviewData.topRecommendedRoute.terrain_type}</strong>
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ color: '#94a3b8', fontSize: '0.88rem' }}>No active recommendations at this time.</div>
+                      )}
+
+                      <button
+                        onClick={() => setActiveMenu('patrol_planning')}
+                        className="btn-tactical btn-tactical-primary"
+                        style={{ width: '100%', padding: '14px', marginTop: 'auto' }}
+                      >
+                        <span>Launch Risk-Based Patrol Dispatch</span>
+                        <ChevronRight size={18} />
+                      </button>
                     </div>
-                    <p style={{ margin: '6px 0 0', color: '#cbd5e1', fontSize: '0.82rem', lineHeight: 1.5 }}>
-                      {currentParkId === 2 ? 'Unmonitored for 68 hours along Kokmote sandstone riverbanks with high risk of night incursion.' : currentParkId === 3 ? 'Unmonitored for 82 hours with 4 recent elephant fence breaches and severe crop-raiding threats.' : 'Unmonitored for 74 consecutive hours with 3 recent acoustic snare anomalies. 82% coverage deficit detected along the river corridor.'}
-                    </p>
                   </div>
-
-                  <button
-                    onClick={() => setActiveMenu('patrol_planning')}
-                    className="btn-tactical btn-tactical-primary"
-                    style={{ width: '100%', padding: '14px', marginTop: 'auto' }}
-                  >
-                    <span>Launch Risk-Based Patrol Dispatch</span>
-                    <ChevronRight size={18} />
-                  </button>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           )}
 

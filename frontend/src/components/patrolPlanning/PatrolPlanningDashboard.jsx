@@ -79,9 +79,9 @@ export default function PatrolPlanningDashboard({
             <span>Acoustic Tripwire Alerts</span>
             <span style={{ color: '#34d399', fontSize: '0.75rem' }}>24h Log</span>
           </div>
-          <div className="kpi-card-value">{kpi?.acousticSpikesLast24h || 17} Spikes</div>
+          <div className="kpi-card-value">{kpi?.acousticSpikesLast24h ?? 0} Spikes</div>
           <div className="kpi-card-sub">
-            <TrendingUp size={13} /> Elevated Frequency in Sector 7B
+            <TrendingUp size={13} /> Elevated Frequency in {kpi?.topSectorName || 'Priority Sector'}
           </div>
         </div>
 
@@ -90,9 +90,9 @@ export default function PatrolPlanningDashboard({
             <span>Rangers Deployed</span>
             <span style={{ color: '#34d399', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 6px', borderRadius: 4, fontSize: '0.7rem' }}>ACTIVE</span>
           </div>
-          <div className="kpi-card-value">{kpi?.activeRangersDeployed || '6/9 Deployed'}</div>
+          <div className="kpi-card-value">{kpi?.activeRangersDeployed || '0/0 Active'}</div>
           <div className="kpi-card-sub">
-            <Users size={13} /> 3 Bravo Units Ready
+            <Users size={13} /> {kpi?.standbyUnitsCount ?? 0} Unit{kpi?.standbyUnitsCount !== 1 ? 's' : ''} on Standby
           </div>
         </div>
 
@@ -281,7 +281,7 @@ export default function PatrolPlanningDashboard({
           </div>
 
           {/* Tactical Map Component */}
-          <TacticalMap route={activeRoute} />
+          <TacticalMap route={activeRoute} park={park} />
 
           {/* Explainable AI "Why this route?" Breakdown */}
           <div className="explainable-card">
