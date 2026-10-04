@@ -144,3 +144,36 @@ exports.updateRangerStatus = async (req, res) => {
   }
 };
 
+exports.getStagingPosts = async (req, res) => {
+  try {
+    const parkId = parseInt(req.params.parkId || 1, 10);
+    const posts = await patrolPlanningService.getStagingPosts(parkId);
+    res.status(200).json(posts);
+  } catch (error) {
+    console.error('getStagingPosts error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.createStagingPost = async (req, res) => {
+  try {
+    const newPost = await patrolPlanningService.createStagingPost(req.body);
+    res.status(201).json({ message: 'Staging Outpost successfully commissioned', post: newPost });
+  } catch (error) {
+    console.error('createStagingPost error:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.deleteStagingPost = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const result = await patrolPlanningService.deleteStagingPost(id);
+    res.status(200).json({ message: 'Staging Outpost decommissioned', result });
+  } catch (error) {
+    console.error('deleteStagingPost error:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+

@@ -3,7 +3,8 @@ import {
   Mail, Lock, Phone, Hash, MapPin, UserPlus, 
   LayoutDashboard, Users, Settings, LogOut, ShieldAlert, Compass,
   Radio, CheckCircle2, AlertTriangle, Eye, RefreshCw, ChevronRight, Sliders, Shield,
-  Search, Filter, Save, RotateCcw, AlertCircle, Award, Check
+  Search, Filter, Save, RotateCcw, AlertCircle, Award, Check,
+  Trash2, Plus, Building, Layers, Crosshair, ArrowUpRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -178,14 +179,20 @@ export default function ParkManagerDashboard() {
   };
 
   // -------------------------------------------------------------
-  // 4. Officer Commissioning Form State (Real DB rangers registration)
+  // 4. Officer Commissioning Form State (Dynamic DB Staging Posts)
   // -------------------------------------------------------------
+  const [dynamicStagingPosts, setDynamicStagingPosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [isCustomPost, setIsCustomPost] = useState(false);
+
   const [officerForm, setOfficerForm] = useState({
     fullName: '',
     badgeNumber: '',
     callsign: '',
     assignedParkId: currentParkId,
-    baseLocationName: '',
+    baseLocationName: 'Katagamuwa Entrance Post (Block 1)',
+    baseLat: 6.4150,
+    baseLng: 81.4720,
     email: '',
     password: '',
     mobileNumber: '',
@@ -194,6 +201,32 @@ export default function ParkManagerDashboard() {
   });
   const [loadingCommission, setLoadingCommission] = useState(false);
   const [commissionMessage, setCommissionMessage] = useState(null);
+
+  const fetchStagingPosts = async (parkId) => {
+    setLoadingPosts(true);
+    try {
+      const posts = await apiService.getStagingPosts(parkId);
+      if (Array.isArray(posts) && posts.length > 0) {
+        setDynamicStagingPosts(posts);
+        if (!isCustomPost) {
+          setOfficerForm(prev => ({
+            ...prev,
+            baseLocationName: posts[0].name,
+            baseLat: posts[0].lat,
+            baseLng: posts[0].lng
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load staging posts from DB:', err);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStagingPosts(officerForm.assignedParkId || currentParkId);
+  }, [officerForm.assignedParkId, currentParkId]);
 
   const availableCertifications = [
     'GPS & Night Tracking',
@@ -222,28 +255,32 @@ export default function ParkManagerDashboard() {
     try {
       await apiService.registerRanger({
         ...officerForm,
-        assignedParkId: currentParkId
+        assignedParkId: officerForm.assignedParkId || currentParkId
       });
 
-      const parkName = availableParks.find(p => p.id === currentParkId)?.name || 'the National Park';
+      const parkName = availableParks.find(p => p.id === (officerForm.assignedParkId || currentParkId))?.name || 'the National Park';
       setCommissionMessage({
         type: 'success',
-        text: `Officer ${officerForm.fullName} (${officerForm.callsign}) successfully commissioned to ${parkName}!`
+        text: `Officer ${officerForm.fullName} (${officerForm.callsign}) successfully commissioned to ${parkName} at ${officerForm.baseLocationName} (GPS: ${officerForm.baseLat}° N, ${officerForm.baseLng}° E)!`
       });
 
       // Reset form
+      const defaultPost = dynamicStagingPosts[0];
       setOfficerForm({
         fullName: '',
         badgeNumber: '',
         callsign: '',
         assignedParkId: currentParkId,
-        baseLocationName: '',
+        baseLocationName: defaultPost?.name || 'Katagamuwa Entrance Post',
+        baseLat: defaultPost?.lat || 6.4150,
+        baseLng: defaultPost?.lng || 81.4720,
         email: '',
         password: '',
         mobileNumber: '',
         maxActiveAssignments: 5,
         certifications: ['GPS & Night Tracking', 'Wildlife First Aid & Triage']
       });
+      setIsCustomPost(false);
 
       fetchOfficers();
     } catch (err) {
@@ -290,6 +327,7 @@ export default function ParkManagerDashboard() {
   useEffect(() => {
     if (activeMenu === 'settings') {
       fetchParkSettings();
+      fetchStagingPosts(currentParkId);
     }
   }, [activeMenu, currentParkId]);
 
@@ -316,6 +354,113 @@ export default function ParkManagerDashboard() {
       target_coverage_percent: 90
     });
   };
+
+  // -------------------------------------------------------------
+  // 6. Park Infrastructure & Forward Staging Outpost Management
+  // -------------------------------------------------------------
+  const [settingsTab, setSettingsTab] = useState('infrastructure'); // 'infrastructure' | 'thresholds'
+  const [infraFilter, setInfraFilter] = useState('ALL'); // 'ALL' | 'OUTPOSTS' | 'WAYPOINTS'
+  const [showAddPostModal, setShowAddPostModal] = useState(false);
+  const [newPostForm, setNewPostForm] = useState({
+    name: '',
+    postType: 'FORWARD_OUTPOST',
+    latitude: 6.3845,
+    longitude: 81.5050
+  });
+  const [savingPost, setSavingPost] = useState(false);
+  const [postActionMsg, setPostActionMsg] = useState(null);
+  const [deletingPostId, setDeletingPostId] = useState(null);
+
+  const parkCenterCoords = {
+    1: { lat: 6.3845, lng: 81.5050, label: 'Yala Center' },
+    2: { lat: 8.4350, lng: 80.0300, label: 'Wilpattu Center' },
+    3: { lat: 6.4500, lng: 80.8800, label: 'Udawalawe Center' }
+  };
+
+  const handleOpenAddPostModal = () => {
+    const def = parkCenterCoords[currentParkId] || parkCenterCoords[1];
+    setNewPostForm({
+      name: '',
+      postType: 'FORWARD_OUTPOST',
+      latitude: def.lat,
+      longitude: def.lng
+    });
+    setPostActionMsg(null);
+    setShowAddPostModal(true);
+  };
+
+  const handleUpgradeCheckpoint = (checkpoint) => {
+    setNewPostForm({
+      name: checkpoint.name,
+      postType: 'FORWARD_OUTPOST',
+      latitude: checkpoint.lat,
+      longitude: checkpoint.lng
+    });
+    setPostActionMsg({
+      type: 'info',
+      text: `Promoting route waypoint "${checkpoint.name}" into an official permanent forward staging station.`
+    });
+    setShowAddPostModal(true);
+  };
+
+  const handleCreateStagingPost = async (e) => {
+    e.preventDefault();
+    if (!newPostForm.name.trim() || newPostForm.latitude === '' || newPostForm.longitude === '') {
+      setPostActionMsg({ type: 'error', text: 'Outpost designation, Latitude, and Longitude are required.' });
+      return;
+    }
+    const lat = parseFloat(newPostForm.latitude);
+    const lng = parseFloat(newPostForm.longitude);
+    if (isNaN(lat) || isNaN(lng)) {
+      setPostActionMsg({ type: 'error', text: 'Latitude and Longitude must be valid numerical GPS coordinates.' });
+      return;
+    }
+
+    setSavingPost(true);
+    setPostActionMsg(null);
+    try {
+      await apiService.createStagingPost({
+        parkId: currentParkId,
+        name: newPostForm.name.trim(),
+        latitude: lat,
+        longitude: lng,
+        postType: newPostForm.postType
+      });
+      setPostActionMsg({
+        type: 'success',
+        text: `Forward Outpost "${newPostForm.name.trim()}" successfully commissioned into ${availableParks.find(p => p.id === currentParkId)?.name || 'the park'}.`
+      });
+      await fetchStagingPosts(currentParkId);
+      setShowAddPostModal(false);
+      setNewPostForm({ name: '', postType: 'FORWARD_OUTPOST', latitude: '', longitude: '' });
+    } catch (err) {
+      setPostActionMsg({ type: 'error', text: `Failed to commission outpost: ${err.message}` });
+    } finally {
+      setSavingPost(false);
+    }
+  };
+
+  const handleDeleteStagingPost = async (post) => {
+    if (!post.id) {
+      alert('Route waypoints and system gate complexes are protected and cannot be deleted.');
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to decommission "${post.name}" from active park infrastructure?`)) {
+      return;
+    }
+    setDeletingPostId(post.id);
+    setPostActionMsg(null);
+    try {
+      await apiService.deleteStagingPost(post.id);
+      await fetchStagingPosts(currentParkId);
+      setPostActionMsg({ type: 'success', text: `Outpost "${post.name}" has been decommissioned.` });
+    } catch (err) {
+      setPostActionMsg({ type: 'error', text: `Failed to decommission outpost: ${err.message}` });
+    } finally {
+      setDeletingPostId(null);
+    }
+  };
+
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -911,7 +1056,13 @@ export default function ParkManagerDashboard() {
                       <select 
                         className="form-input"
                         value={officerForm.assignedParkId}
-                        onChange={(e) => setOfficerForm({ ...officerForm, assignedParkId: parseInt(e.target.value, 10) })}
+                        onChange={(e) => {
+                          const newParkId = parseInt(e.target.value, 10);
+                          setOfficerForm({
+                            ...officerForm,
+                            assignedParkId: newParkId
+                          });
+                        }}
                       >
                         {availableParks.map(p => (
                           <option key={p.id} value={p.id}>{p.name}</option>
@@ -919,18 +1070,97 @@ export default function ParkManagerDashboard() {
                       </select>
                     </div>
 
-                    <div className="form-group">
-                      <label style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                        Forward Staging Camp / Base Outpost *
-                      </label>
-                      <input 
-                        type="text" 
-                        required 
-                        className="form-input" 
-                        placeholder="e.g. Katagamuwa Entrance Post" 
-                        value={officerForm.baseLocationName} 
-                        onChange={(e) => setOfficerForm({ ...officerForm, baseLocationName: e.target.value })} 
-                      />
+                    <div className="form-group" style={{ flex: '1 1 240px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <label style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: 600 }}>
+                          Forward Staging Camp / Base Outpost *
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomPost(!isCustomPost)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#34d399',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          {isCustomPost ? '← Choose from Database Outposts' : '+ Add Custom Coordinates'}
+                        </button>
+                      </div>
+
+                      {!isCustomPost ? (
+                        <>
+                          <select 
+                            className="form-input"
+                            value={officerForm.baseLocationName}
+                            disabled={loadingPosts}
+                            onChange={(e) => {
+                              const chosenName = e.target.value;
+                              const found = dynamicStagingPosts.find(o => o.name === chosenName);
+                              if (found) {
+                                setOfficerForm({
+                                  ...officerForm,
+                                  baseLocationName: found.name,
+                                  baseLat: found.lat,
+                                  baseLng: found.lng
+                                });
+                              }
+                            }}
+                          >
+                            {loadingPosts ? (
+                              <option>Loading checkpoints from database...</option>
+                            ) : (
+                              dynamicStagingPosts.map(o => (
+                                <option key={o.name} value={o.name}>
+                                  {o.name} {o.source ? `(${o.source})` : ''}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: '0.72rem', color: '#34d399' }}>
+                            <MapPin size={13} />
+                            <span>Database GPS Pin: <strong>{officerForm.baseLat}° N, {officerForm.baseLng}° E</strong> (Real Checkpoint from Supabase)</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <input
+                            type="text"
+                            required
+                            className="form-input"
+                            placeholder="Custom Outpost Name (e.g. Menik Ganga East Post)"
+                            value={officerForm.baseLocationName}
+                            onChange={(e) => setOfficerForm({ ...officerForm, baseLocationName: e.target.value })}
+                          />
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <input
+                              type="number"
+                              step="0.0001"
+                              required
+                              className="form-input"
+                              placeholder="Latitude (e.g. 6.4150)"
+                              value={officerForm.baseLat}
+                              onChange={(e) => setOfficerForm({ ...officerForm, baseLat: parseFloat(e.target.value) || 0 })}
+                            />
+                            <input
+                              type="number"
+                              step="0.0001"
+                              required
+                              className="form-input"
+                              placeholder="Longitude (e.g. 81.4720)"
+                              value={officerForm.baseLng}
+                              onChange={(e) => setOfficerForm({ ...officerForm, baseLng: parseFloat(e.target.value) || 0 })}
+                            />
+                          </div>
+                          <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                            Custom coordinate pin will be recorded to ranger profile and used for Haversine distance.
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="form-group">
@@ -1056,10 +1286,481 @@ export default function ParkManagerDashboard() {
             </div>
           )}
 
-          {/* 5. Park Settings & Telemetry Thresholds Screen */}
+          {/* 5. Park Settings & Infrastructure Console */}
           {activeMenu === 'settings' && (
-            <div className="patrol-console-container" style={{ maxWidth: 960, margin: '0 auto' }}>
-              <div className="panel-card" style={{ padding: '28px 32px' }}>
+            <div className="patrol-console-container" style={{ maxWidth: 1040, margin: '0 auto' }}>
+              {/* Dual-Tab Selector */}
+              <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+                <button
+                  type="button"
+                  onClick={() => setSettingsTab('infrastructure')}
+                  style={{
+                    background: settingsTab === 'infrastructure' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${settingsTab === 'infrastructure' ? '#10b981' : 'rgba(255,255,255,0.08)'}`,
+                    color: settingsTab === 'infrastructure' ? '#34d399' : '#94a3b8',
+                    padding: '10px 20px',
+                    borderRadius: 8,
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <MapPin size={16} color={settingsTab === 'infrastructure' ? '#34d399' : '#94a3b8'} />
+                  <span>Forward Outposts &amp; Infrastructure ({dynamicStagingPosts.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSettingsTab('thresholds')}
+                  style={{
+                    background: settingsTab === 'thresholds' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${settingsTab === 'thresholds' ? '#10b981' : 'rgba(255,255,255,0.08)'}`,
+                    color: settingsTab === 'thresholds' ? '#34d399' : '#94a3b8',
+                    padding: '10px 20px',
+                    borderRadius: 8,
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Sliders size={16} color={settingsTab === 'thresholds' ? '#34d399' : '#94a3b8'} />
+                  <span>Threat &amp; Telemetry Thresholds</span>
+                </button>
+              </div>
+
+              {/* TAB 1: INFRASTRUCTURE & FORWARD OUTPOSTS */}
+              {settingsTab === 'infrastructure' && (
+                <div className="panel-card" style={{ padding: '28px 32px' }}>
+                  {/* Infrastructure Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <Building size={24} color="#34d399" />
+                      <div>
+                        <h2 style={{ margin: 0, color: '#fff', fontSize: '1.25rem' }}>
+                          Forward Staging Outposts &amp; Checkpoints
+                        </h2>
+                        <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                          Commission, maintain, and monitor tactical forward bases, riverine observation towers, and sector gates for {availableParks.find(p => p.id === currentParkId)?.name || 'this National Park'}.
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <button
+                        onClick={() => fetchStagingPosts(currentParkId)}
+                        className="btn-tactical btn-tactical-secondary"
+                        style={{ padding: '8px 14px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                        title="Reload staging outposts from database"
+                      >
+                        <RefreshCw size={13} className={loadingPosts ? 'animate-spin' : ''} />
+                        <span>Refresh Grid</span>
+                      </button>
+
+                      <button
+                        onClick={handleOpenAddPostModal}
+                        className="btn-tactical btn-tactical-primary"
+                        style={{ padding: '8px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                      >
+                        <Plus size={15} />
+                        <span>Commission New Outpost</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Summary Stats Row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 22 }}>
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '12px 16px' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Active Outposts &amp; Gates</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>{dynamicStagingPosts.length} Stations</div>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '12px 16px' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Stationed Personnel</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#6ee7b7', marginTop: 4 }}>
+                        {dynamicStagingPosts.reduce((acc, p) => acc + (p.stationed_count || 0), 0)} Rangers Deployed
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '12px 16px' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Command Jurisdiction</div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#fff', marginTop: 6 }}>
+                        {selectedPark}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Notification Message */}
+                  {postActionMsg && (
+                    <div style={{ 
+                      padding: '12px 16px', 
+                      borderRadius: '8px', 
+                      marginBottom: 18,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      background: postActionMsg.type === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                      color: postActionMsg.type === 'error' ? '#fca5a5' : '#6ee7b7',
+                      border: `1px solid ${postActionMsg.type === 'error' ? '#ef4444' : '#10b981'}`
+                    }}>
+                      {postActionMsg.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+                      <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>{postActionMsg.text}</span>
+                    </div>
+                  )}
+
+                  {/* Commission Outpost Modal */}
+                  {showAddPostModal && (
+                    <div style={{
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'rgba(0, 0, 0, 0.75)',
+                      backdropFilter: 'blur(5px)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 1000,
+                      padding: 20
+                    }}>
+                      <div style={{
+                        background: '#041f1a',
+                        border: '1px solid #10b981',
+                        borderRadius: 12,
+                        padding: '28px 32px',
+                        maxWidth: 580,
+                        width: '100%',
+                        boxShadow: '0 20px 40px rgba(0,0,0,0.8)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <Building size={20} color="#34d399" />
+                            <h3 style={{ margin: 0, color: '#fff', fontSize: '1.15rem' }}>Commission New Forward Outpost</h3>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', background: 'rgba(52,211,153,0.15)', color: '#34d399', padding: '3px 8px', borderRadius: 4, fontWeight: 700 }}>
+                            {selectedPark}
+                          </span>
+                        </div>
+
+                        <p style={{ margin: '0 0 20px', fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                          Establish an official forward staging base or checkpoint. Newly commissioned posts are immediately persisted in the national park database, available for ranger deployment, and factored into the patrol dispatch distance engine.
+                        </p>
+
+                        <form onSubmit={handleCreateStagingPost}>
+                          <div className="form-group" style={{ marginBottom: 14 }}>
+                            <label style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                              Outpost Designation / Name *
+                            </label>
+                            <input 
+                              type="text" 
+                              className="form-input" 
+                              placeholder="e.g., Kumbukkan Riverine Observation Camp"
+                              value={newPostForm.name} 
+                              onChange={(e) => setNewPostForm({ ...newPostForm, name: e.target.value })} 
+                              required
+                            />
+                          </div>
+
+                          <div className="form-group" style={{ marginBottom: 14 }}>
+                            <label style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                              Infrastructure Classification *
+                            </label>
+                            <select 
+                              className="form-input"
+                              value={newPostForm.postType}
+                              onChange={(e) => setNewPostForm({ ...newPostForm, postType: e.target.value })}
+                            >
+                              <option value="FORWARD_OUTPOST">Forward Beat Post (Tactical Patrol Staging)</option>
+                              <option value="RIVERINE_OUTPOST">Riverine Observation Tower (Waterway Surveillance)</option>
+                              <option value="ENTRANCE_POST">Sector Entrance Gate (Controlled Access Point)</option>
+                              <option value="BORDER_CHECKPOINT">Perimeter Border Fence Post (Boundary Control)</option>
+                              <option value="SANCTUARY_POST">High-Value Sanctuary Base Camp</option>
+                              <option value="RAPID_RESPONSE">Anti-Poaching Rapid Strike Post</option>
+                              <option value="MAIN_HEADQUARTERS">Sector Headquarters Operations Base</option>
+                            </select>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+                            <div className="form-group">
+                              <label style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                                GPS Latitude (° N) *
+                              </label>
+                              <input 
+                                type="number" 
+                                step="any"
+                                className="form-input" 
+                                placeholder="6.4150"
+                                value={newPostForm.latitude} 
+                                onChange={(e) => setNewPostForm({ ...newPostForm, latitude: e.target.value })} 
+                                required
+                              />
+                            </div>
+
+                            <div className="form-group">
+                              <label style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                                GPS Longitude (° E) *
+                              </label>
+                              <input 
+                                type="number" 
+                                step="any"
+                                className="form-input" 
+                                placeholder="81.4720"
+                                value={newPostForm.longitude} 
+                                onChange={(e) => setNewPostForm({ ...newPostForm, longitude: e.target.value })} 
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: 6, padding: '10px 14px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Quick Preset Coordinates:</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const def = parkCenterCoords[currentParkId] || parkCenterCoords[1];
+                                setNewPostForm(prev => ({ ...prev, latitude: def.lat, longitude: def.lng }));
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#34d399', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              Reset to Park Sector Center
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={() => setShowAddPostModal(false)}
+                              className="btn-tactical btn-tactical-secondary"
+                              style={{ padding: '10px 18px' }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={savingPost}
+                              className="btn-tactical btn-tactical-primary"
+                              style={{ padding: '10px 22px', display: 'flex', alignItems: 'center', gap: 8 }}
+                            >
+                              {savingPost ? <RefreshCw size={15} className="animate-spin" /> : <Plus size={15} />}
+                              <span>{savingPost ? 'Commissioning...' : 'Authorize & Commission'}</span>
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Filter Sub-Bar */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginRight: 4 }}>Filter View:</span>
+                      <button
+                        type="button"
+                        onClick={() => setInfraFilter('ALL')}
+                        style={{
+                          background: infraFilter === 'ALL' ? 'rgba(52,211,153,0.2)' : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${infraFilter === 'ALL' ? '#34d399' : 'rgba(255,255,255,0.1)'}`,
+                          color: infraFilter === 'ALL' ? '#34d399' : '#94a3b8',
+                          padding: '5px 12px',
+                          borderRadius: 6,
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        All Infrastructure ({dynamicStagingPosts.length})
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setInfraFilter('OUTPOSTS')}
+                        style={{
+                          background: infraFilter === 'OUTPOSTS' ? 'rgba(52,211,153,0.2)' : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${infraFilter === 'OUTPOSTS' ? '#34d399' : 'rgba(255,255,255,0.1)'}`,
+                          color: infraFilter === 'OUTPOSTS' ? '#34d399' : '#94a3b8',
+                          padding: '5px 12px',
+                          borderRadius: 6,
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Active Forward Outposts ({dynamicStagingPosts.filter(p => Boolean(p.id)).length})
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setInfraFilter('WAYPOINTS')}
+                        style={{
+                          background: infraFilter === 'WAYPOINTS' ? 'rgba(52,211,153,0.2)' : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${infraFilter === 'WAYPOINTS' ? '#34d399' : 'rgba(255,255,255,0.1)'}`,
+                          color: infraFilter === 'WAYPOINTS' ? '#34d399' : '#94a3b8',
+                          padding: '5px 12px',
+                          borderRadius: 6,
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Patrol Route Waypoints ({dynamicStagingPosts.filter(p => !p.id).length})
+                      </button>
+                    </div>
+
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      Showing {dynamicStagingPosts.filter(p => infraFilter === 'OUTPOSTS' ? Boolean(p.id) : infraFilter === 'WAYPOINTS' ? !p.id : true).length} locations
+                    </span>
+                  </div>
+
+                  {/* Outpost Tactical Table */}
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="tactical-table">
+                      <thead>
+                        <tr>
+                          <th>Outpost Designation</th>
+                          <th>Classification</th>
+                          <th>GPS Geolocation</th>
+                          <th>Stationed Strength</th>
+                          <th>Operational Authority</th>
+                          <th style={{ textAlign: 'center' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dynamicStagingPosts
+                          .filter(post => {
+                            if (infraFilter === 'OUTPOSTS') return Boolean(post.id);
+                            if (infraFilter === 'WAYPOINTS') return !post.id;
+                            return true;
+                          })
+                          .map((post, idx) => {
+                            const isHQ = post.post_type === 'MAIN_HEADQUARTERS' || post.name.includes('Headquarters');
+                            const isDeleting = deletingPostId === post.id;
+                            const isCommissioned = Boolean(post.id);
+
+                            return (
+                              <tr key={post.id || post.name || idx} className="tactical-row">
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <MapPin size={15} color={isHQ ? '#f59e0b' : '#34d399'} />
+                                    <div>
+                                      <span style={{ fontWeight: 700, color: '#fff', display: 'block' }}>{post.name}</span>
+                                      <span style={{ fontSize: '0.68rem', color: isCommissioned ? '#34d399' : '#94a3b8' }}>
+                                        {isCommissioned ? 'Official Ranger Base' : 'Patrol Trail Landmark'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td>
+                                  <span style={{
+                                    padding: '3px 8px',
+                                    borderRadius: 4,
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    background: isHQ ? 'rgba(245, 158, 11, 0.15)' : post.post_type === 'RIVERINE_OUTPOST' ? 'rgba(6, 182, 212, 0.15)' : post.post_type === 'ENTRANCE_POST' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(52, 211, 153, 0.15)',
+                                    color: isHQ ? '#fbbf24' : post.post_type === 'RIVERINE_OUTPOST' ? '#67e8f9' : post.post_type === 'ENTRANCE_POST' ? '#93c5fd' : '#34d399',
+                                    border: `1px solid ${isHQ ? 'rgba(245,158,11,0.3)' : 'rgba(52,211,153,0.3)'}`
+                                  }}>
+                                    {post.post_type?.replace(/_/g, ' ') || 'FORWARD OUTPOST'}
+                                  </span>
+                                </td>
+
+                                <td>
+                                  <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#cbd5e1' }}>
+                                    {post.lat ? `${post.lat.toFixed(4)}° N, ${post.lng.toFixed(4)}° E` : '—'}
+                                  </span>
+                                </td>
+
+                                <td>
+                                  {isCommissioned ? (
+                                    post.stationed_count > 0 ? (
+                                      <span style={{ color: '#34d399', fontWeight: 700, fontSize: '0.78rem' }}>
+                                        {post.stationed_count} Officer{post.stationed_count > 1 ? 's' : ''} Stationed
+                                      </span>
+                                    ) : (
+                                      <span style={{ color: '#6ee7b7', fontSize: '0.74rem' }}>
+                                        Standby Base / Ready
+                                      </span>
+                                    )
+                                  ) : (
+                                    <span style={{ color: '#94a3b8', fontSize: '0.74rem' }}>
+                                      Patrol Transit Point
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td>
+                                  <span style={{ fontSize: '0.72rem', color: isCommissioned ? '#34d399' : '#cbd5e1' }}>
+                                    {post.source || 'Commissioned Outpost'}
+                                  </span>
+                                </td>
+
+                                <td style={{ textAlign: 'center' }}>
+                                  {isCommissioned ? (
+                                    <button
+                                      onClick={() => handleDeleteStagingPost(post)}
+                                      disabled={isDeleting}
+                                      style={{
+                                        background: 'rgba(239, 68, 68, 0.12)',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        color: '#f87171',
+                                        padding: '5px 10px',
+                                        borderRadius: 6,
+                                        fontSize: '0.72rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 5
+                                      }}
+                                      title="Decommission this forward outpost"
+                                    >
+                                      <Trash2 size={12} />
+                                      <span>{isDeleting ? 'Removing...' : 'Decommission'}</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleUpgradeCheckpoint(post)}
+                                      style={{
+                                        background: 'rgba(16, 185, 129, 0.12)',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        color: '#34d399',
+                                        padding: '5px 10px',
+                                        borderRadius: 6,
+                                        fontSize: '0.72rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 5
+                                      }}
+                                      title="Upgrade this route waypoint into an official stationed forward base"
+                                    >
+                                      <ArrowUpRight size={13} />
+                                      <span>Upgrade to Station</span>
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: THREAT & TELEMETRY RULES */}
+              {settingsTab === 'thresholds' && (
+                <div className="panel-card" style={{ padding: '28px 32px' }}>
+
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <Sliders size={24} color="#34d399" />
@@ -1279,6 +1980,7 @@ export default function ParkManagerDashboard() {
                   </div>
                 </form>
               </div>
+              )}
             </div>
           )}
         </div>

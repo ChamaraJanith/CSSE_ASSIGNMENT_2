@@ -149,6 +149,26 @@ class ApiService {
       body: JSON.stringify({ status })
     });
   }
+
+  // --- Dynamic Staging Posts & Checkpoints ---
+  async getStagingPosts(parkId = 1) {
+    return this.fetchWithHandleError(`/patrol-planning/staging-posts/${parkId}`);
+  }
+
+  async createStagingPost(payload) {
+    return this.fetchWithHandleError('/patrol-planning/staging-posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async deleteStagingPost(id) {
+    return this.fetchWithHandleError(`/patrol-planning/staging-posts/${id}`, {
+      method: 'DELETE'
+    });
+  }
 }
 
 export const apiService = new ApiService();
+
