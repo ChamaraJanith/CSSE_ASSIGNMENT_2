@@ -47,6 +47,10 @@ export default function PatrolPlanningDashboard({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div className="telemetry-item" style={{ color: '#94a3b8', fontSize: '0.78rem' }}>
+            <Clock size={13} color="#34d399" />
+            <span>Data Last Synced: <strong style={{ color: '#fff' }}>{telemetry?.lastSynced ? new Date(telemetry.lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Live'}</strong></span>
+          </div>
+          <div className="telemetry-item" style={{ color: '#94a3b8', fontSize: '0.78rem' }}>
             <Radio size={14} color="#10b981" />
             <span>Telemetry: <strong style={{ color: '#34d399' }}>{telemetry?.networkHealth || '99.4% Live'}</strong></span>
           </div>
@@ -182,7 +186,7 @@ export default function PatrolPlanningDashboard({
                     >
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 700, color: '#fff' }}>{route.route_name}</span>
                             {isRec && (
                               <span style={{ 
@@ -195,6 +199,19 @@ export default function PatrolPlanningDashboard({
                                 fontWeight: 800
                               }}>
                                 ★ RECOMMENDED
+                              </span>
+                            )}
+                            {route.is_telemetry_stale && (
+                              <span style={{ 
+                                background: 'rgba(245, 158, 11, 0.15)', 
+                                color: '#fde68a', 
+                                border: '1px solid rgba(245, 158, 11, 0.4)', 
+                                borderRadius: 4, 
+                                fontSize: '0.62rem', 
+                                padding: '1px 5px',
+                                fontWeight: 700
+                              }}>
+                                ⚠ LIMITED CONFIDENCE
                               </span>
                             )}
                           </div>
@@ -282,6 +299,27 @@ export default function PatrolPlanningDashboard({
 
           {/* Tactical Map Component */}
           <TacticalMap route={activeRoute} park={park} />
+
+          {/* Limited Confidence Warning Banner (Stale Telemetry Notice) */}
+          {activeRoute?.is_telemetry_stale && (
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid #f59e0b',
+              borderRadius: 8,
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              color: '#fde68a',
+              fontSize: '0.8rem',
+              marginTop: 10
+            }}>
+              <AlertTriangle size={18} color="#f59e0b" style={{ flexShrink: 0 }} />
+              <div>
+                <strong>Limited Confidence Alert:</strong> Incident and sensor coverage telemetry for this sector is older than 48 hours. Field radio confirmation recommended before dispatch.
+              </div>
+            </div>
+          )}
 
           {/* Explainable AI "Why this route?" Breakdown */}
           <div className="explainable-card">
