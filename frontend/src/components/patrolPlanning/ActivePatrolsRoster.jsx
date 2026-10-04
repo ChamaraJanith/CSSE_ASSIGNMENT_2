@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 
-export default function ActivePatrolsRoster({ onPlanNewPatrol, onSelectPlanToInspect }) {
+export default function ActivePatrolsRoster({ onPlanNewPatrol, onSelectPlanToInspect, parkId = 1 }) {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('ALL');
@@ -14,7 +14,7 @@ export default function ActivePatrolsRoster({ onPlanNewPatrol, onSelectPlanToIns
   const fetchPlans = async () => {
     setLoading(true);
     try {
-      const data = await apiService.getAllPatrolPlans(1);
+      const data = await apiService.getAllPatrolPlans(parkId);
       setPlans(data);
     } catch (err) {
       console.error('Fetch plans error:', err);
@@ -25,7 +25,7 @@ export default function ActivePatrolsRoster({ onPlanNewPatrol, onSelectPlanToIns
 
   useEffect(() => {
     fetchPlans();
-  }, []);
+  }, [parkId]);
 
   const handleCancelPlan = async (planId) => {
     const reason = prompt('Please enter the cancellation justification (saved for audit trail):', 'Adverse weather conditions / road impassable');
@@ -78,7 +78,7 @@ export default function ActivePatrolsRoster({ onPlanNewPatrol, onSelectPlanToIns
               Active Patrol Plans &amp; Deployment Roster
             </h2>
             <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-              Persistent Operational History • Yala National Park Command
+              Persistent Operational History • Patrol Command Centre
             </span>
           </div>
         </div>

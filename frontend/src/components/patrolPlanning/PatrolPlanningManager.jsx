@@ -333,6 +333,7 @@ export default function PatrolPlanningManager({ parkId = 1 }) {
 
       {activeStep === 'ROSTER' && (
         <ActivePatrolsRoster
+          parkId={parkId}
           onPlanNewPatrol={handleStartNewPatrol}
           onSelectPlanToInspect={(p) => {
             setConfirmedPlan(p);

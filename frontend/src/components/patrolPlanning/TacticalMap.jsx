@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Layers, MapPin, Navigation, Radio, Compass, ShieldAlert, Eye } from 'lucide-react';
 
-export default function TacticalMap({ route, riskZones = [], rangers = [], selectedRanger = null }) {
+export default function TacticalMap({ route, park, riskZones = [], rangers = [], selectedRanger = null }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const [layerType, setLayerType] = useState('satellite'); // 'satellite' or 'tactical'
@@ -200,9 +200,11 @@ export default function TacticalMap({ route, riskZones = [], rangers = [], selec
         backdropFilter: 'blur(8px)'
       }}>
         <Navigation size={13} color="#34d399" />
-        <span style={{ color: '#fff', fontWeight: 700 }}>{route?.route_name || 'Sector 7B - Northern River Basin'}</span>
+        <span style={{ color: '#fff', fontWeight: 700 }}>{route?.route_name || park?.name || 'Tactical Overview'}</span>
         <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
-        <span style={{ fontFamily: 'monospace', color: '#94a3b8' }}>Yala NP Ruhuna (06°24'N / 81°32'E)</span>
+        <span style={{ fontFamily: 'monospace', color: '#94a3b8' }}>
+          {checkpoints[0] ? `${Number(checkpoints[0].lat).toFixed(2)}°N / ${Number(checkpoints[0].lng).toFixed(2)}°E` : 'GPS N/A'}
+        </span>
       </div>
 
       {/* Real Map Layer Switcher (Satellite vs Tactical Dark) */}

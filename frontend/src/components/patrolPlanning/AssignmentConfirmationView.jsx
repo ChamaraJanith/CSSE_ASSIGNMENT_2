@@ -133,7 +133,7 @@ export default function AssignmentConfirmationView({
               <CheckCircle2 size={16} color="#34d399" />
             </div>
             <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Telemetry Packet Transmitted</span>
-            <span style={{ fontSize: '0.7rem', color: '#6ee7b7', fontFamily: 'monospace' }}>Ack Code: #TX-9942</span>
+            <span style={{ fontSize: '0.7rem', color: '#6ee7b7', fontFamily: 'monospace' }}>Ack Code: #TX-{String(currentPlan?.id || 9942).padStart(4, '0')}</span>
           </div>
 
           {/* Stage 2: Delivered */}
