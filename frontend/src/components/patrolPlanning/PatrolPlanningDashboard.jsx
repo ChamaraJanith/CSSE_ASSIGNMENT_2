@@ -201,6 +201,19 @@ export default function PatrolPlanningDashboard({
                                 ★ RECOMMENDED
                               </span>
                             )}
+                            {route.hasActivePatrol && (
+                              <span style={{ 
+                                background: 'rgba(59, 130, 246, 0.2)', 
+                                color: '#60a5fa', 
+                                border: '1px solid #3b82f6', 
+                                borderRadius: 4, 
+                                fontSize: '0.65rem', 
+                                padding: '1px 5px',
+                                fontWeight: 800
+                              }}>
+                                ⚡ ACTIVE PATROL
+                              </span>
+                            )}
                             {route.is_telemetry_stale && (
                               <span style={{ 
                                 background: 'rgba(245, 158, 11, 0.15)', 
