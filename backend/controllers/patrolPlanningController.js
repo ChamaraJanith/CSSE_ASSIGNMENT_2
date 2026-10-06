@@ -1,8 +1,6 @@
-// ==============================================================================
-// WildGuard - UC01 Controller
-// ==============================================================================
-
 const patrolPlanningService = require('../services/patrolPlanningService');
+const rangerService = require('../services/rangerService');
+const parkInfrastructureService = require('../services/parkInfrastructureService');
 
 exports.getDashboardData = async (req, res) => {
   try {
@@ -92,7 +90,7 @@ exports.deletePatrolPlan = async (req, res) => {
 exports.getParkSettings = async (req, res) => {
   try {
     const parkId = parseInt(req.params.parkId || 1, 10);
-    const settings = await patrolPlanningService.getParkSettings(parkId);
+    const settings = await parkInfrastructureService.getParkSettings(parkId);
     res.status(200).json(settings);
   } catch (error) {
     console.error('getParkSettings error:', error);
@@ -103,7 +101,7 @@ exports.getParkSettings = async (req, res) => {
 exports.updateParkSettings = async (req, res) => {
   try {
     const parkId = parseInt(req.params.parkId || 1, 10);
-    const updated = await patrolPlanningService.updateParkSettings(parkId, req.body);
+    const updated = await parkInfrastructureService.updateParkSettings(parkId, req.body);
     res.status(200).json({ message: 'Park settings and telemetry thresholds updated successfully', settings: updated });
   } catch (error) {
     console.error('updateParkSettings error:', error);
@@ -113,7 +111,7 @@ exports.updateParkSettings = async (req, res) => {
 
 exports.registerRanger = async (req, res) => {
   try {
-    const ranger = await patrolPlanningService.registerRanger(req.body);
+    const ranger = await rangerService.registerRanger(req.body);
     res.status(201).json({ message: 'Ranger commissioned to active duty successfully', ranger });
   } catch (error) {
     console.error('registerRanger error:', error);
@@ -124,7 +122,7 @@ exports.registerRanger = async (req, res) => {
 exports.getRangersByPark = async (req, res) => {
   try {
     const parkId = parseInt(req.params.parkId || 1, 10);
-    const rangers = await patrolPlanningService.getRangersByPark(parkId);
+    const rangers = await rangerService.getRangersByPark(parkId);
     res.status(200).json(rangers);
   } catch (error) {
     console.error('getRangersByPark error:', error);
@@ -136,7 +134,7 @@ exports.updateRangerStatus = async (req, res) => {
   try {
     const rangerId = parseInt(req.params.id, 10);
     const { status } = req.body;
-    const updated = await patrolPlanningService.updateRangerStatus(rangerId, status);
+    const updated = await rangerService.updateRangerStatus(rangerId, status);
     res.status(200).json({ message: 'Ranger status updated successfully', ranger: updated });
   } catch (error) {
     console.error('updateRangerStatus error:', error);
@@ -147,7 +145,7 @@ exports.updateRangerStatus = async (req, res) => {
 exports.getStagingPosts = async (req, res) => {
   try {
     const parkId = parseInt(req.params.parkId || 1, 10);
-    const posts = await patrolPlanningService.getStagingPosts(parkId);
+    const posts = await parkInfrastructureService.getStagingPosts(parkId);
     res.status(200).json(posts);
   } catch (error) {
     console.error('getStagingPosts error:', error);
@@ -157,7 +155,7 @@ exports.getStagingPosts = async (req, res) => {
 
 exports.createStagingPost = async (req, res) => {
   try {
-    const newPost = await patrolPlanningService.createStagingPost(req.body);
+    const newPost = await parkInfrastructureService.createStagingPost(req.body);
     res.status(201).json({ message: 'Staging Outpost successfully commissioned', post: newPost });
   } catch (error) {
     console.error('createStagingPost error:', error);
@@ -168,12 +166,10 @@ exports.createStagingPost = async (req, res) => {
 exports.deleteStagingPost = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const result = await patrolPlanningService.deleteStagingPost(id);
+    const result = await parkInfrastructureService.deleteStagingPost(id);
     res.status(200).json({ message: 'Staging Outpost decommissioned', result });
   } catch (error) {
     console.error('deleteStagingPost error:', error);
     res.status(400).json({ error: error.message });
   }
 };
-
-

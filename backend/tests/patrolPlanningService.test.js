@@ -1,136 +1,307 @@
 const patrolPlanningService = require('../services/patrolPlanningService');
+const { supabaseAdmin } = require('../supabaseClient');
+const heuristicsEngine = require('../utils/heuristicsEngine');
 
-describe('UC01: Patrol Planning Heuristic Engine & Business Rules Unit Tests', () => {
+jest.mock('../supabaseClient', () => ({
+  supabaseAdmin: {
+    from: jest.fn()
+  }
+}));
 
-  describe('BR-UC01-03 / OI1: Explainable RoutePriorityScore Calculation', () => {
-    test('should correctly compute composite score and breakdown using documented formula', () => {
-      const mockRoute = {
-        coverage_gap_percent: 80,
-        last_patrolled_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-        base_risk_level: 'HIGH', // Weight 7.5
-        recent_incident_count: 3
-      };
+describe('Patrol Planning Service', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
 
-      const result = patrolPlanningService.calculateRoutePriority(mockRoute);
+  describe('getAllPatrolPlans', () => {
+    test('should fetch and return all patrol plans successfully', async () => {
+      const mockData = [{ id: 1, plan_code: 'PP-2026-123' }];
+      const mockOrder = jest.fn().mockResolvedValue({ data: mockData, error: null });
+      const mockEq = jest.fn().mockReturnValue({ order: mockOrder });
+      const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
+      
+      supabaseAdmin.from.mockReturnValue({ select: mockSelect });
 
-      // Expected calculation:
-      // coverageGapScore = (80 / 100) * 10 * 0.35 = 2.80
-      // daysUnpatrolledScore = (7 / 14) * 10 * 0.25 = 1.25
-      // riskZoneScore = 7.5 * 0.25 = 1.875
-      // incidentScore = (3 / 5) * 10 * 0.15 = 0.90
-      // total = 2.80 + 1.25 + 1.875 + 0.90 = 6.825 -> rounded to 6.8
-
-      expect(result.totalThreatScore).toBe(6.8);
-      expect(result.calculatedPriority).toBe('HIGH');
-      expect(result.breakdown.coverageGapPercent).toBe(80);
-      expect(result.breakdown.coverageGapContribution).toBe(2.8);
-      expect(result.breakdown.recentIncidentCount).toBe(3);
-      expect(result.breakdown.recentIncidentsContribution).toBe(0.9);
-      expect(result.breakdown.riskZoneSeverity).toBe('HIGH');
+      const result = await patrolPlanningService.getAllPatrolPlans(1);
+      
+      expect(supabaseAdmin.from).toHaveBeenCalledWith('patrol_plans');
+      expect(mockSelect).toHaveBeenCalled();
+      expect(result).toEqual(mockData);
     });
 
-    test('should classify route as CRITICAL when composite score >= 7.5', () => {
-      const criticalRoute = {
-        coverage_gap_percent: 95,
-        last_patrolled_date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-        base_risk_level: 'CRITICAL', // 10.0
-        recent_incident_count: 5
-      };
+    test('should throw error when db fetch fails', async () => {
+      const mockOrder = jest.fn().mockResolvedValue({ data: null, error: { message: 'DB fetch failed' } });
+      const mockEq = jest.fn().mockReturnValue({ order: mockOrder });
+      const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
+      
+      supabaseAdmin.from.mockReturnValue({ select: mockSelect });
 
-      const result = patrolPlanningService.calculateRoutePriority(criticalRoute);
-      expect(result.totalThreatScore).toBeGreaterThanOrEqual(7.5);
-      expect(result.calculatedPriority).toBe('CRITICAL');
-    });
-
-    test('should classify route as LOW when risk, gap and incidents are minimal', () => {
-      const lowRoute = {
-        coverage_gap_percent: 10,
-        last_patrolled_date: new Date().toISOString(),
-        base_risk_level: 'LOW', // 2.0
-        recent_incident_count: 0
-      };
-
-      const result = patrolPlanningService.calculateRoutePriority(lowRoute);
-      expect(result.totalThreatScore).toBeLessThan(3.5);
-      expect(result.calculatedPriority).toBe('LOW');
+      await expect(patrolPlanningService.getAllPatrolPlans(1)).rejects.toThrow('Fetch plans error: DB fetch failed');
     });
   });
 
-  describe('BR-UC01-07 / UC01-C04: Schedule Conflict Detection Formula', () => {
-    test('should detect overlapping time intervals on the same day for a ranger', () => {
-      const existingPlanStart = patrolPlanningService.timeToMinutes('09:00');
-      const existingPlanEnd = existingPlanStart + (4 * 60); // 13:00
+  describe('deletePatrolPlan', () => {
+    test('should soft-cancel an active plan', async () => {
+      const mockPlan = { id: 1, status: 'ASSIGNED', ranger_id: 10 };
+      const mockSingle = jest.fn().mockResolvedValue({ data: mockPlan, error: null });
+      const mockEq = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
+      
+      const mockUpdateSingle = jest.fn().mockResolvedValue({ data: { ...mockPlan, status: 'CANCELLED' }, error: null });
+      const mockUpdateSelect = jest.fn().mockReturnValue({ single: mockUpdateSingle });
+      const mockUpdateEq = jest.fn().mockReturnValue({ select: mockUpdateSelect });
+      const mockUpdate = jest.fn().mockReturnValue({ eq: mockUpdateEq });
 
-      // Scenario A: Overlapping start (10:00 to 14:00)
-      const targetStartA = patrolPlanningService.timeToMinutes('10:00');
-      const targetEndA = targetStartA + (4 * 60);
-      const isOverlapA = targetStartA < existingPlanEnd && targetEndA > existingPlanStart;
-      expect(isOverlapA).toBe(true);
+      const mockInsert = jest.fn().mockResolvedValue({ error: null });
 
-      // Scenario B: Non-overlapping slot after shift (14:00 to 18:00)
-      const targetStartB = patrolPlanningService.timeToMinutes('14:00');
-      const targetEndB = targetStartB + (4 * 60);
-      const isOverlapB = targetStartB < existingPlanEnd && targetEndB > existingPlanStart;
-      expect(isOverlapB).toBe(false);
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_plans') {
+          return { select: mockSelect, update: mockUpdate };
+        }
+        if (table === 'rangers') {
+          return { select: mockSelect, update: mockUpdate };
+        }
+        if (table === 'patrol_plan_status_history') {
+          return { insert: mockInsert };
+        }
+      });
 
-      // Scenario C: Non-overlapping slot before shift (04:00 to 08:00)
-      const targetStartC = patrolPlanningService.timeToMinutes('04:00');
-      const targetEndC = targetStartC + (4 * 60);
-      const isOverlapC = targetStartC < existingPlanEnd && targetEndC > existingPlanStart;
-      expect(isOverlapC).toBe(false);
+      const result = await patrolPlanningService.deletePatrolPlan(1);
+      expect(result.deleted).toBe(false);
+      expect(result.type).toBe('CANCELLED');
+    });
+
+    test('should hard-delete a draft plan', async () => {
+      const mockPlan = { id: 2, status: 'DRAFT', ranger_id: null };
+      const mockSingle = jest.fn().mockResolvedValue({ data: mockPlan, error: null });
+      const mockEq = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
+
+      const mockDeleteEq = jest.fn().mockResolvedValue({ error: null });
+      const mockDelete = jest.fn().mockReturnValue({ eq: mockDeleteEq });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_plans') {
+          return { select: mockSelect, delete: mockDelete };
+        }
+      });
+
+      const result = await patrolPlanningService.deletePatrolPlan(2);
+      expect(result.deleted).toBe(true);
+      expect(result.type).toBe('HARD_DELETE');
     });
   });
 
-  describe('BR-UC01-05 / OI2: Ranger Workload & Eligibility Validation', () => {
-    test('should identify ranger as ineligible if active assignments reach maximum workload', () => {
-      const ranger = {
-        current_status: 'AVAILABLE',
-        active_assignments_count: 5,
-        max_active_assignments: 5,
-        is_rest_compliant: true
+  describe('updatePlanStatus', () => {
+    test('should update status and auto-revert to PENDING_ASSIGNMENT if DECLINED', async () => {
+      const mockPlan = { id: 1, status: 'ASSIGNED', ranger_id: 10 };
+      const mockSingle = jest.fn().mockResolvedValue({ data: mockPlan, error: null });
+      const mockEq = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
+
+      const mockUpdateSingle = jest.fn().mockResolvedValue({ data: { ...mockPlan, status: 'PENDING_ASSIGNMENT' }, error: null });
+      const mockUpdateSelect = jest.fn().mockReturnValue({ single: mockUpdateSingle });
+      const mockUpdateEq = jest.fn().mockReturnValue({ select: mockUpdateSelect });
+      const mockUpdate = jest.fn().mockReturnValue({ eq: mockUpdateEq });
+
+      const mockInsert = jest.fn().mockResolvedValue({ error: null });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_plans') {
+          return { select: mockSelect, update: mockUpdate };
+        }
+        if (table === 'rangers') {
+          return { select: mockSelect, update: mockUpdate };
+        }
+        if (table === 'patrol_plan_status_history') {
+          return { insert: mockInsert };
+        }
+      });
+
+      const result = await patrolPlanningService.updatePlanStatus(1, 'DECLINED', 'Not available');
+      expect(result.status).toBe('PENDING_ASSIGNMENT');
+    });
+
+    test('should update status to ACKNOWLEDGED', async () => {
+      const mockPlan = { id: 1, status: 'ASSIGNED', ranger_id: 10 };
+      const mockSingle = jest.fn().mockResolvedValue({ data: mockPlan, error: null });
+      const mockEq = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
+
+      const mockUpdateSingle = jest.fn().mockResolvedValue({ data: { ...mockPlan, status: 'ACKNOWLEDGED' }, error: null });
+      const mockUpdateSelect = jest.fn().mockReturnValue({ single: mockUpdateSingle });
+      const mockUpdateEq = jest.fn().mockReturnValue({ select: mockUpdateSelect });
+      const mockUpdate = jest.fn().mockReturnValue({ eq: mockUpdateEq });
+
+      const mockInsert = jest.fn().mockResolvedValue({ error: null });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_plans') {
+          return { select: mockSelect, update: mockUpdate };
+        }
+        if (table === 'patrol_plan_status_history') {
+          return { insert: mockInsert };
+        }
+      });
+
+      const result = await patrolPlanningService.updatePlanStatus(1, 'ACKNOWLEDGED', 'Will do');
+      expect(result.status).toBe('ACKNOWLEDGED');
+    });
+  });
+
+  describe('createPatrolPlan', () => {
+    test('[POSITIVE CASE] should successfully create a drafted patrol plan', async () => {
+      const mockPayload = {
+        parkId: 1,
+        routeId: 2,
+        patrolDate: '2026-10-10',
+        startTime: '08:00',
+        priority: 'HIGH',
+        saveAsDraft: true
       };
+      
+      const mockSingle = jest.fn().mockResolvedValue({ data: { id: 100, ...mockPayload, status: 'DRAFT' }, error: null });
+      const mockSelect = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockInsert = jest.fn().mockReturnValue({ select: mockSelect });
 
-      const isWorkloadOk = ranger.active_assignments_count < ranger.max_active_assignments;
-      expect(isWorkloadOk).toBe(false);
+      const mockHistoryInsert = jest.fn().mockResolvedValue({ error: null });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_plans') return { insert: mockInsert };
+        if (table === 'patrol_plan_status_history') return { insert: mockHistoryInsert };
+      });
+
+      const result = await patrolPlanningService.createPatrolPlan(mockPayload, 1);
+      expect(result.status).toBe('DRAFT');
     });
 
-    test('should identify ranger as eligible when active assignments are below maximum workload', () => {
-      const ranger = {
-        current_status: 'AVAILABLE',
-        active_assignments_count: 2,
-        max_active_assignments: 5,
-        is_rest_compliant: true
+    test('[ERROR CASE] should throw error if missing mandatory fields', async () => {
+      await expect(patrolPlanningService.createPatrolPlan({}, 1)).rejects.toThrow('Mandatory patrol parameters missing');
+    });
+
+    test('[ERROR CASE] should throw error if route override lacks reason', async () => {
+      const mockPayload = {
+        parkId: 1, routeId: 2, patrolDate: '2026-10-10', startTime: '08:00', priority: 'HIGH',
+        isRouteOverridden: true, routeOverrideReason: 'no'
       };
+      await expect(patrolPlanningService.createPatrolPlan(mockPayload, 1)).rejects.toThrow('A recorded override reason is required');
+    });
 
-      const isWorkloadOk = ranger.active_assignments_count < ranger.max_active_assignments;
-      expect(isWorkloadOk).toBe(true);
+    test('[POSITIVE CASE] should assign plan and update ranger assignment count', async () => {
+      const mockPayload = {
+        parkId: 1, routeId: 2, patrolDate: '2026-10-10', startTime: '08:00', priority: 'HIGH',
+        rangerId: 10
+      };
+      
+      const mockSingle = jest.fn().mockResolvedValue({ data: { id: 100, ...mockPayload, status: 'ASSIGNED' }, error: null });
+      const mockSelect = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockInsert = jest.fn().mockReturnValue({ select: mockSelect });
+
+      const mockHistoryInsert = jest.fn().mockResolvedValue({ error: null });
+
+      const mockRangerSingle = jest.fn().mockResolvedValue({ data: { active_assignments_count: 0 }, error: null });
+      const mockRangerEq = jest.fn().mockReturnValue({ single: mockRangerSingle });
+      const mockRangerSelect = jest.fn().mockReturnValue({ eq: mockRangerEq });
+      
+      const mockRangerUpdateEq = jest.fn().mockResolvedValue({ error: null });
+      const mockRangerUpdate = jest.fn().mockReturnValue({ eq: mockRangerUpdateEq });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_plans') return { insert: mockInsert };
+        if (table === 'patrol_plan_status_history') return { insert: mockHistoryInsert };
+        if (table === 'rangers') return { select: mockRangerSelect, update: mockRangerUpdate };
+        if (table === 'patrol_notification_logs') return { insert: mockHistoryInsert };
+      });
+
+      const result = await patrolPlanningService.createPatrolPlan(mockPayload, 1);
+      expect(result.status).toBe('ASSIGNED');
     });
   });
 
-  describe('BR-UC01-08 / OI3: Priority Acknowledgement Deadline Calculation', () => {
-    test('should set shorter acknowledgement deadlines for higher priority missions', () => {
-      const deadlineMinutesMap = { 'CRITICAL': 15, 'HIGH': 30, 'MEDIUM': 60, 'LOW': 120 };
+  describe('getDashboardData', () => {
+    test('should return dashboard telemetry, KPIs and routes', async () => {
+      const mockSingle = jest.fn().mockResolvedValue({ data: { id: 1, name: 'Yala' }, error: null });
+      const mockEqSingle = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockSelectSingle = jest.fn().mockReturnValue({ eq: mockEqSingle });
 
-      expect(deadlineMinutesMap['CRITICAL']).toBe(15);
-      expect(deadlineMinutesMap['HIGH']).toBe(30);
-      expect(deadlineMinutesMap['MEDIUM']).toBe(60);
-      expect(deadlineMinutesMap['LOW']).toBe(120);
+      const mockEqMultiple = jest.fn().mockResolvedValue({ data: [], error: null });
+      const mockSelectMultiple = jest.fn().mockReturnValue({ eq: mockEqMultiple });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'parks') return { select: mockSelectSingle };
+        if (table === 'patrol_routes' || table === 'risk_zones' || table === 'rangers') return { select: mockSelectMultiple };
+      });
+
+      const result = await patrolPlanningService.getDashboardData(1);
+      expect(result.park.name).toBe('Yala');
+      expect(result.telemetry).toBeDefined();
+      expect(result.kpi).toBeDefined();
+      expect(result.routes).toBeDefined();
     });
   });
 
-  describe('Helper Utilities: Proximity & Time conversion', () => {
-    test('timeToMinutes converts HH:MM format correctly', () => {
-      expect(patrolPlanningService.timeToMinutes('09:30')).toBe(570);
-      expect(patrolPlanningService.timeToMinutes('00:00')).toBe(0);
-      expect(patrolPlanningService.timeToMinutes('23:59')).toBe(1439);
+  describe('getRangerRecommendations', () => {
+    test('[POSITIVE CASE] should recommend the best ranger based on heuristics', async () => {
+      const mockRoute = { id: 1, park_id: 1, checkpoints: [{ lat: 6.4, lng: 81.5 }] };
+      const mockRangers = [
+        { id: 10, current_status: 'AVAILABLE', active_assignments_count: 0, max_active_assignments: 5, is_rest_compliant: true, current_lat: 6.41, current_lng: 81.51 },
+        { id: 11, current_status: 'ON_SHIFT', active_assignments_count: 2, max_active_assignments: 5, is_rest_compliant: true, current_lat: 6.5, current_lng: 81.6 }
+      ];
+      const mockExistingPlans = [];
+
+      const mockRouteSingle = jest.fn().mockResolvedValue({ data: mockRoute, error: null });
+      const mockRouteEq = jest.fn().mockReturnValue({ single: mockRouteSingle });
+      const mockRouteSelect = jest.fn().mockReturnValue({ eq: mockRouteEq });
+
+      const mockRangerEq = jest.fn().mockResolvedValue({ data: mockRangers, error: null });
+      const mockRangerSelect = jest.fn().mockReturnValue({ eq: mockRangerEq });
+
+      const mockPlanIn = jest.fn().mockResolvedValue({ data: mockExistingPlans, error: null });
+      const mockPlanEq = jest.fn().mockReturnValue({ in: mockPlanIn });
+      const mockPlanSelect = jest.fn().mockReturnValue({ eq: mockPlanEq });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_routes') return { select: mockRouteSelect };
+        if (table === 'rangers') return { select: mockRangerSelect };
+        if (table === 'patrol_plans') return { select: mockPlanSelect };
+      });
+
+      const result = await patrolPlanningService.getRangerRecommendations(1, '2026-10-10', '08:00', 4);
+      expect(result.recommendedRanger.id).toBe(10);
+      expect(result.rangers.length).toBe(2);
     });
 
-    test('calculateDistance computes realistic geographic distances', () => {
-      // Yala Block 1 to Block 2 (~15-20km)
-      const dist = patrolPlanningService.calculateDistance(6.4020, 81.5120, 6.5500, 81.6500);
-      expect(dist).toBeGreaterThan(10);
-      expect(dist).toBeLessThan(35);
+    test('[EDGE CASE] should identify schedule conflicts exactly when times overlap', async () => {
+      const mockRoute = { id: 1, park_id: 1, checkpoints: [{ lat: 6.4, lng: 81.5 }] };
+      const mockRangers = [
+        { id: 10, current_status: 'AVAILABLE', active_assignments_count: 0, max_active_assignments: 5, is_rest_compliant: true, current_lat: 6.41, current_lng: 81.51 }
+      ];
+      // Plan exists at 08:00 for 4 hours
+      const mockExistingPlans = [
+        { id: 1, ranger_id: 10, start_time: '08:00', estimated_duration_hours: 4, status: 'ASSIGNED' }
+      ];
+
+      const mockRouteSingle = jest.fn().mockResolvedValue({ data: mockRoute, error: null });
+      const mockRouteEq = jest.fn().mockReturnValue({ single: mockRouteSingle });
+      const mockRouteSelect = jest.fn().mockReturnValue({ eq: mockRouteEq });
+
+      const mockRangerEq = jest.fn().mockResolvedValue({ data: mockRangers, error: null });
+      const mockRangerSelect = jest.fn().mockReturnValue({ eq: mockRangerEq });
+
+      const mockPlanIn = jest.fn().mockResolvedValue({ data: mockExistingPlans, error: null });
+      const mockPlanEq = jest.fn().mockReturnValue({ in: mockPlanIn });
+      const mockPlanSelect = jest.fn().mockReturnValue({ eq: mockPlanEq });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_routes') return { select: mockRouteSelect };
+        if (table === 'rangers') return { select: mockRangerSelect };
+        if (table === 'patrol_plans') return { select: mockPlanSelect };
+      });
+
+      // Querying for 09:00 for 4 hours -> overlaps!
+      const result = await patrolPlanningService.getRangerRecommendations(1, '2026-10-10', '09:00', 4);
+      expect(result.rangers[0].hasScheduleConflict).toBe(true);
+      expect(result.recommendedRanger.isTopRecommendation).toBe(false);
     });
   });
-
 });
