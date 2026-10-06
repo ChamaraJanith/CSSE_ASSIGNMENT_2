@@ -39,6 +39,16 @@ class PatrolPlanningService {
       r.current_status === 'AVAILABLE' && (r.active_assignments_count || 0) < (r.max_active_assignments || 5)
     ).length || 0;
 
+    // Fetch ALL currently active patrol plans (ASSIGNED, ACKNOWLEDGED, PENDING)
+    // We remove the date filter to avoid Timezone issues (e.g. night shifts crossing midnight)
+    const { data: activePlans } = await supabaseAdmin
+      .from('patrol_plans')
+      .select('route_id')
+      .eq('park_id', parkId)
+      .in('status', ['ASSIGNED', 'ACKNOWLEDGED', 'PENDING_ASSIGNMENT']);
+    
+    const activeRouteIds = activePlans ? activePlans.map(p => p.route_id) : [];
+
     const scoredRoutes = routes.map(route => {
       const scoring = heuristicsEngine.calculateRoutePriority(route, riskZones);
       return {
@@ -46,21 +56,29 @@ class PatrolPlanningService {
         threatScore: scoring.totalThreatScore,
         systemRecommendedPriority: scoring.calculatedPriority,
         scoreBreakdown: scoring.breakdown,
-        isRecommended: false
+        isRecommended: false,
+        hasActivePatrol: activeRouteIds.includes(route.id)
       };
     });
 
     scoredRoutes.sort((a, b) => b.threatScore - a.threatScore);
-    if (scoredRoutes.length > 0) {
+    
+    // Recommend the highest-scoring route that does NOT already have an active patrol
+    const recommendableRoute = scoredRoutes.find(r => !r.hasActivePatrol);
+    if (recommendableRoute) {
+      recommendableRoute.isRecommended = true;
+    } else if (scoredRoutes.length > 0) {
+      // Fallback if all routes have patrols
       scoredRoutes[0].isRecommended = true;
     }
 
-    const unmonitoredBlindspots = scoredRoutes.filter(r => r.coverage_gap_percent > 70).length;
+    // A route is no longer a "blindspot" if a ranger is actively assigned to it
+    const unmonitoredBlindspots = scoredRoutes.filter(r => r.coverage_gap_percent > 70 && !r.hasActivePatrol).length;
     const totalIncidents = scoredRoutes.reduce((sum, r) => sum + (r.recent_incident_count || 0), 0);
     const avgCoverage = Math.round(100 - (scoredRoutes.reduce((sum, r) => sum + r.coverage_gap_percent, 0) / (scoredRoutes.length || 1)));
 
     const acousticSpikes = Math.round((totalIncidents * 2.4) + (unmonitoredBlindspots * 3));
-    const topRoute = scoredRoutes[0];
+    const topRoute = recommendableRoute || scoredRoutes[0];
 
     return {
       park,
