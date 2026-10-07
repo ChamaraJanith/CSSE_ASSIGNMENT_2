@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { ArrowLeft, ArrowRight, ChevronRight, CheckCircle2, Info, MapPin } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Info, MapPin } from 'lucide-react';
+import RuleStepper from './RuleStepper';
 import RuleValidationErrors from './RuleValidationErrors';
 import {
-  FORM_STEPS, LAST_STEP, REVIEW_STEP, TOTAL_STEPS, findZone, formatZone, getOptionLabel, groupErrorsByField,
-  isStepComplete, toggleRecipient,
+  FORM_STEPS, LAST_STEP, TOTAL_STEPS, findZone, formatZone, getOptionLabel, groupErrorsByField,
+  isStepComplete, orderPriorityOptions, toggleRecipient,
 } from './monitoringRuleUtils';
 
 function FieldError({ id, messages }) {
@@ -104,30 +105,7 @@ export default function RuleConfigurationForm({
         </button>
       </div>
 
-      <nav className="command-stepper-bar" aria-label="Rule configuration steps">
-        <div className="stepper-nav">
-          {FORM_STEPS.map((entry, index) => (
-            <React.Fragment key={entry.id}>
-              {index > 0 && <ChevronRight size={14} color="#64748b" />}
-              <button
-                type="button"
-                className={`step-node mr-step-button ${step === entry.id ? 'active' : step > entry.id ? 'completed' : ''}`}
-                aria-current={step === entry.id ? 'step' : undefined}
-                disabled={submitting || !canOpenStep(entry.id)}
-                onClick={() => onStepChange(entry.id)}
-              >
-                <span className="step-num">{entry.id}</span>
-                <span>{entry.label}</span>
-              </button>
-            </React.Fragment>
-          ))}
-          <ChevronRight size={14} color="#64748b" />
-          <span className="step-node mr-step-pending" title="Reached after the configuration passes validation">
-            <span className="step-num">{REVIEW_STEP.id}</span>
-            <span>{REVIEW_STEP.label}</span>
-          </span>
-        </div>
-      </nav>
+      <RuleStepper activeStep={step} canOpenStep={canOpenStep} disabled={submitting} onStepChange={onStepChange} />
 
       <form ref={formRef} className="mr-form" onSubmit={handleSubmit} noValidate>
         <RuleValidationErrors message={message} errors={errors} conflicts={conflicts} />
@@ -209,25 +187,62 @@ export default function RuleConfigurationForm({
           )}
 
           {step === 2 && (
-            <div className="mr-field-grid">
-              <div className="mr-field">
-                <label htmlFor="mr-alert-priority">Alert Priority <span className="mr-required">(required)</span></label>
-                <select
-                  id="mr-alert-priority"
-                  value={form.alertPriority}
-                  onChange={(event) => onFieldChange('alertPriority', event.target.value)}
-                  {...errorProps('alertPriority', fieldErrors)}
-                >
-                  <option value="">Select alert priority</option>
-                  {(options?.alertPriorities || []).map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-                <FieldError id="mr-error-alertPriority" messages={fieldErrors.alertPriority} />
+            <section className="mr-step-section" aria-labelledby="mr-step2-title">
+              <div className="mr-section-header">
+                <h3 id="mr-step2-title" className="mr-section-title">Priority &amp; Notifications</h3>
+                <span className="mr-park-chip"><MapPin size={14} /> {parkName}</span>
               </div>
 
-              <div className="mr-field">
-                <label htmlFor="mr-response-behaviour">Response Behaviour <span className="mr-required">(required)</span></label>
+              <fieldset
+                className="mr-choice-group"
+                aria-describedby={fieldErrors.alertPriority ? 'mr-error-alertPriority' : undefined}
+              >
+                <legend>Alert Priority <span className="mr-required">*</span></legend>
+                <div className="mr-choice-grid mr-priority-grid">
+                  {orderPriorityOptions(options?.alertPriorities).map((option) => (
+                    <label key={option.value} className={`mr-option mr-option-inline ${form.alertPriority === option.value ? 'selected' : ''}`}>
+                      <input
+                        type="radio"
+                        name="alertPriority"
+                        value={option.value}
+                        checked={form.alertPriority === option.value}
+                        onChange={() => onFieldChange('alertPriority', option.value)}
+                        {...errorProps('alertPriority', fieldErrors)}
+                      />
+                      <span className={`badge-risk ${option.value.toLowerCase()}`}>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <FieldError id="mr-error-alertPriority" messages={fieldErrors.alertPriority} />
+              </fieldset>
+
+              <fieldset
+                className="mr-choice-group"
+                aria-describedby={fieldErrors.notificationRecipients ? 'mr-error-notificationRecipients' : undefined}
+              >
+                <legend>Notification Recipients <span className="mr-required">* (select at least one)</span></legend>
+                <div className="mr-choice-grid">
+                  {(options?.recipientRoles || []).map((option) => {
+                    const checked = form.notificationRecipients.includes(option.value);
+                    return (
+                      <label key={option.value} className={`mr-option mr-option-inline ${checked ? 'selected' : ''}`}>
+                        <input
+                          type="checkbox"
+                          value={option.value}
+                          checked={checked}
+                          onChange={() => onFieldChange('notificationRecipients', toggleRecipient(form.notificationRecipients, option.value))}
+                          {...errorProps('notificationRecipients', fieldErrors)}
+                        />
+                        <span className="mr-option-label">{option.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <FieldError id="mr-error-notificationRecipients" messages={fieldErrors.notificationRecipients} />
+              </fieldset>
+
+              <div className="mr-field mr-field-narrow">
+                <label htmlFor="mr-response-behaviour">Response Behaviour <span className="mr-required">*</span></label>
                 <select
                   id="mr-response-behaviour"
                   value={form.responseBehaviour}
@@ -242,30 +257,8 @@ export default function RuleConfigurationForm({
                 <FieldError id="mr-error-responseBehaviour" messages={fieldErrors.responseBehaviour} />
               </div>
 
-              <fieldset
-                className="mr-choice-group mr-field-wide"
-                aria-describedby={fieldErrors.notificationRecipients ? 'mr-error-notificationRecipients' : undefined}
-              >
-                <legend>Notification Recipients <span className="mr-required">(at least one)</span></legend>
-                <div className="mr-checkbox-row">
-                  {(options?.recipientRoles || []).map((option) => (
-                    <label key={option.value} className="mr-checkbox">
-                      <input
-                        type="checkbox"
-                        value={option.value}
-                        checked={form.notificationRecipients.includes(option.value)}
-                        onChange={() => onFieldChange('notificationRecipients', toggleRecipient(form.notificationRecipients, option.value))}
-                        {...errorProps('notificationRecipients', fieldErrors)}
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </div>
-                <FieldError id="mr-error-notificationRecipients" messages={fieldErrors.notificationRecipients} />
-              </fieldset>
-
-              <div className="mr-field mr-field-wide">
-                <label htmlFor="mr-notes">Notes (optional)</label>
+              <div className="mr-field">
+                <label htmlFor="mr-notes">Additional Notes <span className="mr-required">(optional)</span></label>
                 <textarea
                   id="mr-notes"
                   rows={3}
@@ -276,20 +269,21 @@ export default function RuleConfigurationForm({
                 />
                 <FieldError id="mr-error-notes" messages={fieldErrors.notes} />
               </div>
-            </div>
+            </section>
           )}
         </fieldset>
 
         <div className="mr-actions mr-actions-split">
-          <button type="button" className="btn-tactical btn-tactical-secondary" onClick={onCancel} disabled={submitting}>
-            Cancel
-          </button>
+          {step > 1 ? (
+            <button type="button" className="btn-tactical btn-tactical-secondary" onClick={() => onStepChange(step - 1)} disabled={submitting}>
+              <ArrowLeft size={16} /> Back
+            </button>
+          ) : (
+            <button type="button" className="btn-tactical btn-tactical-secondary" onClick={onCancel} disabled={submitting}>
+              Cancel
+            </button>
+          )}
           <div className="mr-actions">
-            {step > 1 && (
-              <button type="button" className="btn-tactical btn-tactical-secondary" onClick={() => onStepChange(step - 1)} disabled={submitting}>
-                <ArrowLeft size={16} /> Back
-              </button>
-            )}
             {step < LAST_STEP ? (
               <button type="submit" className="btn-tactical btn-tactical-primary" disabled={!stepComplete || submitting}>
                 Next <ArrowRight size={16} />

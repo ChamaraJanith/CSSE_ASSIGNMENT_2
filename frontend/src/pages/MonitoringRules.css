@@ -394,14 +394,26 @@
   align-items: center;
 }
 
-.mr-field-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+/* --- Step 2: Priority & Notifications (storyboard layout) --- */
+.mr-priority-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
-.mr-field-wide {
-  grid-column: 1 / -1;
+.mr-option-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.mr-option-inline input {
+  align-self: center;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.mr-field-narrow {
+  max-width: 420px;
 }
 
 .mr-field {
@@ -430,25 +442,6 @@
 
 .mr-field [aria-invalid='true'] {
   border-color: var(--cmd-red);
-}
-
-.mr-checkbox-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 20px;
-}
-
-.mr-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  color: var(--cmd-text-heading);
-  cursor: pointer;
-}
-
-.mr-checkbox input {
-  accent-color: var(--cmd-emerald);
 }
 
 .mr-field-error,
@@ -536,6 +529,38 @@
   overflow-wrap: anywhere;
 }
 
+/* --- Review (Step 3 of 3, storyboard layout) --- */
+.mr-review-intro {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--cmd-text-body);
+}
+
+.mr-review-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--cmd-border);
+  background: var(--cmd-bg-card);
+}
+
+.mr-review-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mr-edit-button {
+  padding: 7px 14px;
+  font-size: 0.8rem;
+}
+
 .mr-result-header {
   display: flex;
   gap: 14px;
@@ -551,6 +576,53 @@
 .mr-result-header p {
   margin: 4px 0 0;
   color: var(--cmd-text-body);
+}
+
+/* --- Result / confirmation --- */
+.mr-result-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.mr-result-status.is-active {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.mr-result-status-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mr-status-badge-lg {
+  padding: 6px 16px;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+}
+
+.mr-result-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  font-size: 0.82rem;
+}
+
+.mr-result-meta dt {
+  color: var(--cmd-text-muted);
+}
+
+.mr-result-meta dd {
+  margin: 2px 0 0;
+  color: var(--cmd-text-heading);
 }
 
 /* --- Actions & states --- */
@@ -601,9 +673,12 @@
 
 /* --- Responsive --- */
 @media (max-width: 900px) {
-  .mr-field-grid,
   .mr-step1-grid {
     grid-template-columns: 1fr;
+  }
+
+  .mr-field-narrow {
+    max-width: none;
   }
 
   .mr-park-hint {

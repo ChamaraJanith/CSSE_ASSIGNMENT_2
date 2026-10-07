@@ -88,6 +88,21 @@ export const findZone = (riskZones, riskZoneId) =>
 export const getRuleZoneLabel = (rule, riskZones) =>
   formatZone(rule.riskZone || findZone(riskZones, rule.riskZoneId));
 
+// Presentation order for the Step 2 priority choices (storyboard: Low -> Critical). Values are not
+// changed; any option not listed keeps its backend order after the listed ones.
+const PRIORITY_DISPLAY_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+export const orderPriorityOptions = (options) => {
+  const rank = (option) => {
+    const index = PRIORITY_DISPLAY_ORDER.indexOf(option.value);
+    return index === -1 ? PRIORITY_DISPLAY_ORDER.length : index;
+  };
+  return (options || [])
+    .map((option, position) => ({ option, position }))
+    .sort((a, b) => rank(a.option) - rank(b.option) || a.position - b.position)
+    .map(({ option }) => option);
+};
+
 export const filterByTab = (rules, tab) =>
   !tab || tab === LIST_TABS.ALL ? rules : rules.filter((rule) => rule.status === tab);
 

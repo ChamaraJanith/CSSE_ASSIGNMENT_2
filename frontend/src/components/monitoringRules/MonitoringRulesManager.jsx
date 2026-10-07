@@ -5,7 +5,7 @@ import MonitoringRuleList from './MonitoringRuleList';
 import RuleConfigurationForm from './RuleConfigurationForm';
 import RuleReviewView from './RuleReviewView';
 import RuleResultView from './RuleResultView';
-import { EMPTY_RULE_FORM, buildRulePayload, describeApiError, firstStepWithError } from './monitoringRuleUtils';
+import { EMPTY_RULE_FORM, LAST_STEP, buildRulePayload, describeApiError, firstStepWithError } from './monitoringRuleUtils';
 import '../../pages/PatrolPlanning.css';
 import '../../pages/MonitoringRules.css';
 
@@ -109,12 +109,23 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
     clearFeedback();
     setReviewRule(null);
     setReviewError(null);
+    setResult(null);
     setScreen(SCREENS.CONFIGURE);
   };
 
   const backToList = () => {
     setScreen(SCREENS.LIST);
     setResult(null);
+  };
+
+  // Review -> configuration (Back / Edit / stepper). The form keeps every value; the validated rule is
+  // dropped so the Review screen can only be reached again through a new Submit for Validation.
+  const returnToConfiguration = (stepId) => {
+    if (creatingAction) return;
+    setReviewRule(null);
+    setReviewError(null);
+    setStep(stepId);
+    setScreen(SCREENS.CONFIGURE);
   };
 
   const updateField = (field, value) => {
@@ -243,7 +254,8 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
           options={options}
           submittingAction={creatingAction}
           error={reviewError}
-          onBack={() => setScreen(SCREENS.CONFIGURE)}
+          onBack={() => returnToConfiguration(LAST_STEP)}
+          onEdit={returnToConfiguration}
           onCreate={handleCreate}
         />
       )}
@@ -255,6 +267,7 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
           riskZones={riskZones}
           options={options}
           onBackToList={backToList}
+          onCreateAnother={startNewRule}
         />
       )}
     </div>
