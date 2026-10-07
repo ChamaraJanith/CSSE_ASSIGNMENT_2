@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft, CheckCircle2, Save } from 'lucide-react';
 import {
-  NOT_RECORDED, RULE_ACTIONS, findZone, formatRecipients, formatZone, getOptionLabel,
+  NOT_RECORDED, REVIEW_STEP, RULE_ACTIONS, TOTAL_STEPS, findZone, formatRecipients, formatZone, getOptionLabel,
 } from './monitoringRuleUtils';
 
 export function RuleSummary({ rule, parkName, riskZones, options }) {
@@ -36,7 +36,10 @@ export default function RuleReviewView({
   return (
     <div className="panel-card mr-panel">
       <div className="panel-header mr-panel-header">
-        <div className="panel-title"><CheckCircle2 size={20} /> Review Monitoring Rule</div>
+        <div>
+          <div className="panel-title"><CheckCircle2 size={20} /> Review Monitoring Rule</div>
+          <span className="mr-step-indicator">Step {REVIEW_STEP.id} of {TOTAL_STEPS}</span>
+        </div>
       </div>
 
       <div className="mr-notice" role="status">

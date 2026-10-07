@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { ArrowLeft, ArrowRight, ChevronRight, CheckCircle2, Info } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronRight, CheckCircle2, Info, MapPin } from 'lucide-react';
 import RuleValidationErrors from './RuleValidationErrors';
 import {
-  FORM_STEPS, LAST_STEP, groupErrorsByField, isStepComplete, toggleRecipient,
+  FORM_STEPS, LAST_STEP, REVIEW_STEP, TOTAL_STEPS, findZone, formatZone, getOptionLabel, groupErrorsByField,
+  isStepComplete, toggleRecipient,
 } from './monitoringRuleUtils';
 
 function FieldError({ id, messages }) {
@@ -14,6 +15,55 @@ const errorProps = (field, fieldErrors) => (fieldErrors[field]
   ? { 'aria-invalid': true, 'aria-describedby': `mr-error-${field}` }
   : {});
 
+// "About this hazard": only data the system already holds. No hazard descriptions exist in the
+// reference data, so the recorded primary threats of this park's risk zones are shown as context.
+function HazardInfo({ hazardType, options, riskZones, parkName }) {
+  if (!hazardType) {
+    return <p className="mr-muted">Select a hazard or species to see its details.</p>;
+  }
+  const recordedThreats = riskZones.filter((zone) => zone.primaryThreat);
+
+  return (
+    <>
+      <dl className="mr-info-list">
+        <div><dt>Hazard / Species</dt><dd>{getOptionLabel(options?.hazardTypes, hazardType)}</dd></div>
+        <div><dt>Reference code</dt><dd><span className="mr-code">{hazardType}</span></dd></div>
+      </dl>
+      <p className="mr-muted">No detailed description is recorded for this hazard yet.</p>
+      {recordedThreats.length > 0 && (
+        <div className="mr-info-threats">
+          <span className="mr-info-subtitle">Primary threats recorded in {parkName}&apos;s risk zones</span>
+          <ul>
+            {recordedThreats.map((zone) => (
+              <li key={zone.id}><span className="mr-code">{zone.zoneCode}</span> {zone.primaryThreat}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+}
+
+// "Zone Information": the selected zone's fields from the reference data
+function ZoneInfo({ zone, parkName }) {
+  if (!zone) {
+    return <p className="mr-muted">Select a risk zone to see its details.</p>;
+  }
+  return (
+    <dl className="mr-info-list">
+      <div><dt>Zone</dt><dd>{formatZone(zone)}</dd></div>
+      <div><dt>Park</dt><dd>{parkName}</dd></div>
+      {zone.severityLevel && (
+        <div>
+          <dt>Severity</dt>
+          <dd><span className={`badge-risk ${zone.severityLevel.toLowerCase()}`}>{zone.severityLevel}</span></dd>
+        </div>
+      )}
+      {zone.primaryThreat && <div><dt>Primary threat</dt><dd>{zone.primaryThreat}</dd></div>}
+    </dl>
+  );
+}
+
 export default function RuleConfigurationForm({
   parkName, riskZones, options, form, step, errors, conflicts, message, submitting, focusKey,
   onFieldChange, onStepChange, onSubmit, onCancel,
@@ -22,6 +72,8 @@ export default function RuleConfigurationForm({
   const fieldErrors = groupErrorsByField(errors);
   const stepComplete = isStepComplete(step, form);
   const canOpenStep = (stepId) => FORM_STEPS.filter((entry) => entry.id < stepId).every((entry) => isStepComplete(entry.id, form));
+  const selectedZone = findZone(riskZones, form.riskZoneId);
+  const hasZones = riskZones.length > 0;
 
   // After a failed validation, move focus to the first invalid field (or the error summary)
   useEffect(() => {
@@ -43,7 +95,10 @@ export default function RuleConfigurationForm({
   return (
     <div className="panel-card mr-panel">
       <div className="panel-header mr-panel-header">
-        <div className="panel-title">Configure Monitoring Rule</div>
+        <div>
+          <div className="panel-title">Create Monitoring Rule</div>
+          <span className="mr-step-indicator">Step {step} of {TOTAL_STEPS}</span>
+        </div>
         <button type="button" className="btn-tactical btn-tactical-secondary" onClick={onCancel} disabled={submitting}>
           <ArrowLeft size={16} /> Back to Monitoring Rules
         </button>
@@ -66,6 +121,11 @@ export default function RuleConfigurationForm({
               </button>
             </React.Fragment>
           ))}
+          <ChevronRight size={14} color="#64748b" />
+          <span className="step-node mr-step-pending" title="Reached after the configuration passes validation">
+            <span className="step-num">{REVIEW_STEP.id}</span>
+            <span>{REVIEW_STEP.label}</span>
+          </span>
         </div>
       </nav>
 
@@ -75,62 +135,80 @@ export default function RuleConfigurationForm({
 
         <fieldset className="mr-form-body" disabled={submitting}>
           {step === 1 && (
-            <fieldset className="mr-choice-group" aria-describedby={fieldErrors.hazardType ? 'mr-error-hazardType' : undefined}>
-              <legend>Hazard / Species <span className="mr-required">(required)</span></legend>
-              <div className="mr-choice-grid">
-                {(options?.hazardTypes || []).map((option) => (
-                  <label key={option.value} className={`mr-option ${form.hazardType === option.value ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="hazardType"
-                      value={option.value}
-                      checked={form.hazardType === option.value}
-                      onChange={() => onFieldChange('hazardType', option.value)}
-                      {...errorProps('hazardType', fieldErrors)}
-                    />
-                    <span className="mr-option-label">{option.label}</span>
-                  </label>
-                ))}
+            <section className="mr-step-section" aria-labelledby="mr-step1-title">
+              <div className="mr-section-header">
+                <h3 id="mr-step1-title" className="mr-section-title">Hazard and Risk Zone</h3>
+                <span className="mr-park-chip"><MapPin size={14} /> {parkName}</span>
               </div>
-              <FieldError id="mr-error-hazardType" messages={fieldErrors.hazardType} />
-            </fieldset>
+
+              <div className="mr-step1-grid">
+                <div className="mr-step1-column">
+                  <div className="mr-field">
+                    <label htmlFor="mr-hazard-type">Wildlife Hazard / Species <span className="mr-required">*</span></label>
+                    <select
+                      id="mr-hazard-type"
+                      value={form.hazardType}
+                      onChange={(event) => onFieldChange('hazardType', event.target.value)}
+                      {...errorProps('hazardType', fieldErrors)}
+                    >
+                      <option value="">Select hazard / species</option>
+                      {(options?.hazardTypes || []).map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    <FieldError id="mr-error-hazardType" messages={fieldErrors.hazardType} />
+                  </div>
+
+                  <div className="mr-info-card" aria-live="polite">
+                    <h4><Info size={15} /> About this hazard</h4>
+                    <HazardInfo hazardType={form.hazardType} options={options} riskZones={riskZones} parkName={parkName} />
+                  </div>
+                </div>
+
+                <div className="mr-step1-column">
+                  <div className="mr-field">
+                    <label htmlFor="mr-risk-zone">Risk Zone <span className="mr-required">*</span></label>
+                    <select
+                      id="mr-risk-zone"
+                      value={form.riskZoneId === '' ? '' : String(form.riskZoneId)}
+                      onChange={(event) => onFieldChange('riskZoneId', event.target.value === '' ? '' : Number(event.target.value))}
+                      disabled={!hasZones}
+                      {...errorProps('riskZoneId', fieldErrors)}
+                    >
+                      <option value="">{hasZones ? 'Select risk zone' : 'No risk zones available'}</option>
+                      {riskZones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>{formatZone(zone)}</option>
+                      ))}
+                    </select>
+                    <FieldError id="mr-error-riskZoneId" messages={fieldErrors.riskZoneId} />
+                  </div>
+
+                  {hasZones ? (
+                    <div className="mr-info-card" aria-live="polite">
+                      <h4><Info size={15} /> Zone Information</h4>
+                      <ZoneInfo zone={selectedZone} parkName={parkName} />
+                    </div>
+                  ) : (
+                    <div className="mr-notice" role="status">
+                      <Info size={18} /> No risk zones are registered for {parkName}, so a monitoring rule cannot be configured for this park.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mr-map-panel" role="region" aria-label="Park map and risk zone">
+                <div className="mr-map-panel-header">
+                  <MapPin size={16} /> Park Map / Risk Zone
+                </div>
+                <div className="mr-map-placeholder">
+                  <strong>{selectedZone ? formatZone(selectedZone) : parkName}</strong>
+                  <span>Map preview is not available yet: risk-zone boundaries are not part of the monitoring rule data.</span>
+                </div>
+              </div>
+            </section>
           )}
 
           {step === 2 && (
-            <fieldset className="mr-choice-group" aria-describedby={fieldErrors.riskZoneId ? 'mr-error-riskZoneId' : undefined}>
-              <legend>Risk Zone in {parkName} <span className="mr-required">(required)</span></legend>
-              {riskZones.length === 0 ? (
-                <div className="mr-notice" role="status">
-                  <Info size={18} /> No risk zones are registered for {parkName}, so a monitoring rule cannot be configured for this park.
-                </div>
-              ) : (
-                <div className="mr-choice-grid">
-                  {riskZones.map((zone) => (
-                    <label key={zone.id} className={`mr-option ${form.riskZoneId === zone.id ? 'selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="riskZoneId"
-                        value={zone.id}
-                        checked={form.riskZoneId === zone.id}
-                        onChange={() => onFieldChange('riskZoneId', zone.id)}
-                        {...errorProps('riskZoneId', fieldErrors)}
-                      />
-                      <span className="mr-option-label">{zone.zoneCode} – {zone.zoneName}</span>
-                      <span className="mr-option-meta">
-                        {zone.severityLevel && (
-                          <span className={`badge-risk ${zone.severityLevel.toLowerCase()}`}>{zone.severityLevel}</span>
-                        )}
-                        {zone.primaryThreat && <span className="mr-option-hint">{zone.primaryThreat}</span>}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              )}
-              <FieldError id="mr-error-riskZoneId" messages={fieldErrors.riskZoneId} />
-            </fieldset>
-          )}
-
-          {step === 3 && (
             <div className="mr-field-grid">
               <div className="mr-field">
                 <label htmlFor="mr-alert-priority">Alert Priority <span className="mr-required">(required)</span></label>
@@ -202,24 +280,26 @@ export default function RuleConfigurationForm({
           )}
         </fieldset>
 
-        <div className="mr-actions mr-actions-end">
+        <div className="mr-actions mr-actions-split">
           <button type="button" className="btn-tactical btn-tactical-secondary" onClick={onCancel} disabled={submitting}>
             Cancel
           </button>
-          {step > 1 && (
-            <button type="button" className="btn-tactical btn-tactical-secondary" onClick={() => onStepChange(step - 1)} disabled={submitting}>
-              <ArrowLeft size={16} /> Back
-            </button>
-          )}
-          {step < LAST_STEP ? (
-            <button type="submit" className="btn-tactical btn-tactical-primary" disabled={!stepComplete || submitting}>
-              Next <ArrowRight size={16} />
-            </button>
-          ) : (
-            <button type="submit" className="btn-tactical btn-tactical-primary" disabled={submitting}>
-              <CheckCircle2 size={16} /> {submitting ? 'Validating…' : 'Submit for Validation'}
-            </button>
-          )}
+          <div className="mr-actions">
+            {step > 1 && (
+              <button type="button" className="btn-tactical btn-tactical-secondary" onClick={() => onStepChange(step - 1)} disabled={submitting}>
+                <ArrowLeft size={16} /> Back
+              </button>
+            )}
+            {step < LAST_STEP ? (
+              <button type="submit" className="btn-tactical btn-tactical-primary" disabled={!stepComplete || submitting}>
+                Next <ArrowRight size={16} />
+              </button>
+            ) : (
+              <button type="submit" className="btn-tactical btn-tactical-primary" disabled={submitting}>
+                <CheckCircle2 size={16} /> {submitting ? 'Validating…' : 'Submit for Validation'}
+              </button>
+            )}
+          </div>
         </div>
       </form>
     </div>

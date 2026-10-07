@@ -234,6 +234,166 @@
   color: var(--cmd-text-muted);
 }
 
+.mr-step-indicator {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cmd-text-muted);
+}
+
+.mr-step-pending {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.mr-step-pending:hover {
+  color: var(--cmd-text-muted);
+  background: transparent;
+}
+
+/* --- Step 1: Hazard and Risk Zone (storyboard layout) --- */
+.mr-step-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mr-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mr-park-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--cmd-border);
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--cmd-emerald-bright);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.mr-step1-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.mr-step1-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.mr-info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--cmd-border);
+  background: var(--cmd-bg-card);
+}
+
+.mr-info-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cmd-emerald-bright);
+}
+
+.mr-info-list {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.mr-info-list > div {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  font-size: 0.82rem;
+}
+
+.mr-info-list dt {
+  color: var(--cmd-text-muted);
+}
+
+.mr-info-list dd {
+  margin: 0;
+  color: var(--cmd-text-heading);
+  overflow-wrap: anywhere;
+}
+
+.mr-info-subtitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cmd-text-muted);
+}
+
+.mr-info-threats ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.mr-map-panel {
+  border-radius: 12px;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  background: rgba(4, 20, 15, 0.75);
+  overflow: hidden;
+}
+
+.mr-map-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cmd-text-heading);
+}
+
+.mr-map-placeholder {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--cmd-text-muted);
+  background-image:
+    linear-gradient(rgba(52, 211, 153, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.mr-map-placeholder strong {
+  color: var(--cmd-text-heading);
+}
+
+.mr-actions-split {
+  justify-content: space-between;
+  align-items: center;
+}
+
 .mr-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -441,7 +601,8 @@
 
 /* --- Responsive --- */
 @media (max-width: 900px) {
-  .mr-field-grid {
+  .mr-field-grid,
+  .mr-step1-grid {
     grid-template-columns: 1fr;
   }
 
@@ -452,9 +613,14 @@
 }
 
 @media (max-width: 600px) {
-  .mr-summary-row {
+  .mr-summary-row,
+  .mr-info-list > div {
     grid-template-columns: 1fr;
     gap: 2px;
+  }
+
+  .mr-actions-split > .mr-actions {
+    flex: 1 1 100%;
   }
 
   .mr-actions-end {
