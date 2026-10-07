@@ -120,7 +120,7 @@ class ReportService {
 
     async updateReportDetails(code, payload) {
         if (Object.keys(payload).length > 0) {
-            // Rule: Ranger outcome එකක් නැතිව report close කිරීමට උත්සාහ කිරීම (Cannot close without outcome)
+            // Do not close a report without a recorded ranger outcome.
             if (payload.status === 'CLOSED') {
                 const { data: assignments, error: fetchError } = await supabaseAdmin
                     .from('response_assignments')
@@ -153,7 +153,7 @@ class ReportService {
     }
 
     async updateRangerAssignment(assignmentId, rangerStatus, outcome, outcomeImage, requestingUserId) {
-        // Rule: තමන්ට assign නොවූ ranger කෙනෙක් acknowledge/outcome update කිරීමට උත්සාහ කිරීම Block කිරීම
+        // Prevent rangers from updating assignments that are not assigned to them.
         if (requestingUserId) {
             const { data: assignment, error: fetchError } = await supabaseAdmin
                 .from('response_assignments')
@@ -190,13 +190,20 @@ class ReportService {
         }
 
         // Fetch assignment to verify ranger and status
-        const { data: assignment, error: fetchError } = await supabaseAdmin
+        const { data: assignments, error: fetchError } = await supabaseAdmin
             .from('response_assignments')
             .select('ranger_id, status')
             .eq('id', assignmentId)
-            .single();
+            .limit(1);
 
         if (fetchError) throw fetchError;
+
+        const assignment = assignments?.[0];
+        if (!assignment) {
+            const err = new Error('Assignment not found');
+            err.status = 404;
+            throw err;
+        }
 
         if (requestingUserId && assignment.ranger_id !== requestingUserId) {
             const err = new Error('Unauthorized: You can only simulate GPS for your own assignments.');
