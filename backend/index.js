@@ -84,6 +84,9 @@ app.use('/api/reports', reportRoutes);
 const patrolPlanningRoutes = require('./routes/patrolPlanningRoutes');
 app.use('/api/patrol-planning', patrolPlanningRoutes);
 
+const evidenceReviewRoutes = require('./routes/evidenceReviewRoutes');
+app.use('/api/evidence-review', evidenceReviewRoutes);
+
 
 app.listen(PORT, () => {
     console.log(`Server is running on port: ${PORT}`);
