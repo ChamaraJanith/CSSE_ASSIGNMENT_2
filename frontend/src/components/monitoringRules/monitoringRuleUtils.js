@@ -40,14 +40,17 @@ export const FIELD_LABELS = Object.freeze({
   action: 'Action',
 });
 
-// Configuration steps and the form fields each one owns
+// Configuration steps and the form fields each one owns (storyboard: Step 1 = Hazard and Risk Zone)
 export const FORM_STEPS = Object.freeze([
-  { id: 1, label: 'Hazard / Species', fields: ['hazardType'] },
-  { id: 2, label: 'Risk Zone', fields: ['riskZoneId'] },
-  { id: 3, label: 'Priority & Notifications', fields: ['alertPriority', 'notificationRecipients', 'responseBehaviour', 'notes'] },
+  { id: 1, label: 'Hazard & Risk Zone', fields: ['hazardType', 'riskZoneId'] },
+  { id: 2, label: 'Priority & Notifications', fields: ['alertPriority', 'notificationRecipients', 'responseBehaviour', 'notes'] },
 ]);
 
 export const LAST_STEP = FORM_STEPS[FORM_STEPS.length - 1].id;
+
+// The review screen is the final step of the flow, reached only through Submit for Validation
+export const REVIEW_STEP = Object.freeze({ id: LAST_STEP + 1, label: 'Review' });
+export const TOTAL_STEPS = REVIEW_STEP.id;
 
 // riskZoneId is kept as a number (or '' when nothing is selected) so it is sent as a JSON number
 export const EMPTY_RULE_FORM = Object.freeze({
@@ -85,6 +88,21 @@ export const findZone = (riskZones, riskZoneId) =>
 export const getRuleZoneLabel = (rule, riskZones) =>
   formatZone(rule.riskZone || findZone(riskZones, rule.riskZoneId));
 
+// Presentation order for the Step 2 priority choices (storyboard: Low -> Critical). Values are not
+// changed; any option not listed keeps its backend order after the listed ones.
+const PRIORITY_DISPLAY_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+export const orderPriorityOptions = (options) => {
+  const rank = (option) => {
+    const index = PRIORITY_DISPLAY_ORDER.indexOf(option.value);
+    return index === -1 ? PRIORITY_DISPLAY_ORDER.length : index;
+  };
+  return (options || [])
+    .map((option, position) => ({ option, position }))
+    .sort((a, b) => rank(a.option) - rank(b.option) || a.position - b.position)
+    .map(({ option }) => option);
+};
+
 export const filterByTab = (rules, tab) =>
   !tab || tab === LIST_TABS.ALL ? rules : rules.filter((rule) => rule.status === tab);
 
@@ -111,8 +129,7 @@ export const buildRulePayload = (form, parkId) => ({
 
 // Only controls the Next button; the backend decides whether the configuration is valid
 export const isStepComplete = (stepId, form) => {
-  if (stepId === 1) return !isBlank(form.hazardType);
-  if (stepId === 2) return form.riskZoneId !== '';
+  if (stepId === 1) return !isBlank(form.hazardType) && form.riskZoneId !== '';
   return true;
 };
 
