@@ -89,6 +89,9 @@ app.use('/api/evidence-review', evidenceReviewRoutes);
 
 const incidentRoutes = require('./routes/incidentRoutes');
 app.use('/api/incidents', incidentRoutes);
+const monitoringRuleRoutes = require('./routes/monitoringRuleRoutes');
+app.use('/api/monitoring-rules', monitoringRuleRoutes);
+
 
 app.listen(PORT, () => {
     console.log(`Server is running on port: ${PORT}`);
