@@ -18,7 +18,9 @@ class ApiService {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'API request failed');
+        const requestError = new Error(data.error || 'API request failed');
+        requestError.status = response.status;
+        throw requestError;
       }
       return data;
     } catch (error) {
@@ -166,6 +168,25 @@ class ApiService {
   async deleteStagingPost(id) {
     return this.fetchWithHandleError(`/patrol-planning/staging-posts/${id}`, {
       method: 'DELETE'
+    });
+  }
+
+  // --- Evidence Review APIs (UC02) ---
+  async getEvidenceReviewQueue(status = 'ALL', search = '') {
+    const params = new URLSearchParams({ status });
+    if (search) params.append('search', search);
+    return this.fetchWithHandleError(`/evidence-review/queue?${params.toString()}`);
+  }
+
+  async getEvidenceDetail(imageId) {
+    return this.fetchWithHandleError(`/evidence-review/${encodeURIComponent(imageId)}`);
+  }
+
+  async submitEvidenceReview(imageId, payload) {
+    return this.fetchWithHandleError(`/evidence-review/${encodeURIComponent(imageId)}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
   }
 }
