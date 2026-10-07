@@ -13,11 +13,11 @@ const { supabaseAdmin } = require('../supabaseClient');
 const EVIDENCE_BUCKET = 'evidence';
 const SEED_ASSETS_DIR = path.resolve(__dirname, 'seed_assets');
 const SEED_IMAGE_PATHS = [
-  'camera-traps/CT-YALA-01/IMG-YALA01-0001.svg',
-  'camera-traps/CT-YALA-01/IMG-YALA01-0002.svg',
-  'camera-traps/CT-YALA-02/IMG-YALA02-0001.svg',
-  'camera-traps/CT-YALA-02/IMG-YALA02-0002.svg',
-  'camera-traps/CT-WILP-01/IMG-WILP01-0001.svg'
+  'camera-traps/CT-YALA-01/IMG-YALA01-0001.jpg',
+  'camera-traps/CT-YALA-01/IMG-YALA01-0002.jpg',
+  'camera-traps/CT-YALA-02/IMG-YALA02-0001.jpg',
+  'camera-traps/CT-YALA-02/IMG-YALA02-0002.jpg',
+  'camera-traps/CT-WILP-01/IMG-WILP01-0001.jpg'
 ];
 
 async function uploadSeedImages() {
@@ -25,7 +25,7 @@ async function uploadSeedImages() {
     const fileBuffer = fs.readFileSync(path.join(SEED_ASSETS_DIR, storagePath));
     const { error } = await supabaseAdmin.storage
       .from(EVIDENCE_BUCKET)
-      .upload(storagePath, fileBuffer, { contentType: 'image/svg+xml', upsert: true });
+      .upload(storagePath, fileBuffer, { contentType: 'image/jpeg', upsert: true });
 
     if (error) throw new Error(`Upload failed for ${storagePath}: ${error.message}`);
     console.log(`Uploaded ${storagePath}`);
@@ -80,6 +80,7 @@ async function runMigrations() {
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Migration failed:', err);
+    process.exitCode = 1;
   } finally {
     await client.end();
   }
