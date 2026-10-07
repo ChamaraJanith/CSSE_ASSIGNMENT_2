@@ -189,6 +189,33 @@ class ApiService {
       body: JSON.stringify(payload)
     });
   }
+
+  // --- Incidents APIs ---
+  async getIncidents() {
+    return this.fetchWithHandleError('/incidents');
+  }
+
+  async createIncident(payload) {
+    return this.fetchWithHandleError('/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async updateIncident(id, payload) {
+    return this.fetchWithHandleError(`/incidents/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async deleteIncident(id) {
+    return this.fetchWithHandleError(`/incidents/${id}`, {
+      method: 'DELETE'
+    });
+  }
 }
 
 export const apiService = new ApiService();
