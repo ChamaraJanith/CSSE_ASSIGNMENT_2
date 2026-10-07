@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import {
   LayoutDashboard, MapPin, AlertTriangle,
-  ClipboardList, Camera, Settings, LogOut, ShieldAlert, CheckCircle
+  ClipboardList, Camera, Settings, LogOut, ShieldAlert, CheckCircle, ScanSearch
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import EvidenceReviewManager from '../components/evidenceReview/EvidenceReviewManager';
 import './Dashboard.css';
 
 export default function WildlifeOfficerDashboard() {
@@ -178,6 +179,9 @@ export default function WildlifeOfficerDashboard() {
           </li>
           <li className={`sidebar-item ${activeMenu === 'sightings' ? 'active' : ''}`} onClick={() => setActiveMenu('sightings')}>
             <Camera className="sidebar-item-icon" /> Animal Sightings
+          </li>
+          <li className={`sidebar-item ${activeMenu === 'evidence' ? 'active' : ''}`} onClick={() => setActiveMenu('evidence')}>
+            <ScanSearch className="sidebar-item-icon" /> Evidence Review
           </li>
           <li className={`sidebar-item ${activeMenu === 'tasks' ? 'active' : ''}`} onClick={() => setActiveMenu('tasks')}>
             <CheckCircle className="sidebar-item-icon" /> My Tasks
@@ -398,7 +402,9 @@ export default function WildlifeOfficerDashboard() {
             </div>
           )}
 
-          {activeMenu !== 'dashboard' && activeMenu !== 'tasks' && (
+          {activeMenu === 'evidence' && <EvidenceReviewManager />}
+
+          {activeMenu !== 'dashboard' && activeMenu !== 'tasks' && activeMenu !== 'evidence' && (
             <div className="dashboard-card-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px', color: '#94a3b8', position: 'relative', zIndex: 10 }}>
               <h3>This module is under construction.</h3>
             </div>
