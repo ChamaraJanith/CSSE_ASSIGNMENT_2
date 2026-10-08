@@ -35,6 +35,9 @@ const openEvidence = async (user, imageCode, evidence, { loadImage = true } = {}
   return image;
 };
 
+const resultBanner = () => screen.getByRole('status', { name: 'Review result' });
+const outcomeColumn = () => screen.getByLabelText('Review outcome');
+
 const confirmReviewButton = () => screen.getByRole('button', { name: /Confirm Review/ });
 const confirmEscalationButton = () => screen.getByRole('button', { name: /Confirm Escalation/ });
 
@@ -121,8 +124,10 @@ describe('EvidenceReviewManager - classification flow', () => {
 
     expect(apiService.submitEvidenceReview).toHaveBeenCalledWith(3, { classification: 'WILDLIFE_SPECIES', notes: 'Leopard resting on rock' });
     expect(await screen.findByText('Review Completed')).toBeInTheDocument();
-    expect(screen.getByText('Reviewed')).toBeInTheDocument();
+    expect(within(resultBanner()).getByText('Reviewed')).toBeInTheDocument();
+    expect(within(outcomeColumn()).getByText('Reviewed')).toBeInTheDocument();
     expect(screen.getByText(/No threat alert was created/)).toBeInTheDocument();
+    expect(screen.queryByText('Threat Alert ID')).not.toBeInTheDocument();
     expect(screen.getByText('Leopard resting on rock')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /View Alert/ })).not.toBeInTheDocument();
   });
@@ -138,7 +143,10 @@ describe('EvidenceReviewManager - classification flow', () => {
     await user.click(confirmReviewButton());
 
     expect(apiService.submitEvidenceReview).toHaveBeenCalledWith(3, { classification: 'UNKNOWN', notes: '' });
-    expect(await screen.findByText('Needs Further Review')).toBeInTheDocument();
+    expect(await screen.findByText('Review Completed')).toBeInTheDocument();
+    expect(within(resultBanner()).getByText('Needs Further Review')).toBeInTheDocument();
+    expect(within(outcomeColumn()).getByText('Needs Further Review')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /View Alert/ })).not.toBeInTheDocument();
     expect(screen.getByText(/remains in the review queue for secondary review/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Back to Review Queue/ }));
@@ -308,9 +316,12 @@ describe('EvidenceReviewManager - suspicious escalation', () => {
       classification: 'SUSPICIOUS_PERSON', notes: '', escalationConfirmed: true, escalationJustification: JUSTIFICATION,
     });
     expect(await screen.findByText('Review Completed')).toBeInTheDocument();
-    expect(screen.getByText('Reviewed – Escalated')).toBeInTheDocument();
-    expect(screen.getByText('#3')).toBeInTheDocument();
+    expect(within(resultBanner()).getByText('Reviewed – Escalated')).toBeInTheDocument();
+    expect(within(outcomeColumn()).getByText('Reviewed – Escalated')).toBeInTheDocument();
+    expect(within(outcomeColumn()).getByText('TA-2026-0003')).toBeInTheDocument();
     expect(screen.getByText('Linked to Image')).toBeInTheDocument();
+    expect(screen.getByRole('note', { name: 'Threat alert information' }))
+      .toHaveTextContent('A threat alert has been created and is linked to the original camera-trap image.');
   });
 
   test('View Alert shows the alert details returned by the review', async () => {
@@ -322,7 +333,8 @@ describe('EvidenceReviewManager - suspicious escalation', () => {
 
     await user.click(await screen.findByRole('button', { name: /View Alert/ }));
     const details = screen.getByRole('region', { name: 'Threat alert details' });
-    expect(within(details).getByText('Threat Alert #3')).toBeInTheDocument();
+    expect(within(details).getByText('Threat Alert TA-2026-0003')).toBeInTheDocument();
+    expect(within(details).getByText('#3')).toBeInTheDocument();
     expect(within(details).getByText('OPEN')).toBeInTheDocument();
     expect(within(details).getByText('IMG-WILP01-0001 (image #5)')).toBeInTheDocument();
     expect(within(details).getByText(JUSTIFICATION)).toBeInTheDocument();

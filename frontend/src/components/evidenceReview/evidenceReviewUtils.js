@@ -159,6 +159,20 @@ export const formatDateTime = (value) => {
   return Number.isNaN(date.getTime()) ? NOT_RECORDED : dateTimeFormatter.format(date);
 };
 
+const yearFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Colombo', year: 'numeric' });
+
+// Display-only alert reference in the wireframe style (TA-2026-0018). Built from the real numeric alert id and the
+// year the alert was created (park local time); the id the API uses is never changed.
+export const formatThreatAlertId = (id, createdAt) => {
+  const number = Number(id);
+  if (isBlank(id) || !Number.isInteger(number) || number < 0) return NOT_RECORDED;
+  const sequence = String(number).padStart(4, '0');
+  const created = isBlank(createdAt) ? null : new Date(createdAt);
+  return created && !Number.isNaN(created.getTime())
+    ? `TA-${yearFormatter.format(created)}-${sequence}`
+    : `TA-${sequence}`;
+};
+
 export const formatValue = (value, unit = '') => (isBlank(value) ? NOT_RECORDED : `${value}${unit}`);
 
 export const formatLocation = (cameraTrap) => {
