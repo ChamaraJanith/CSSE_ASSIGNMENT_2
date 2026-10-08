@@ -83,6 +83,22 @@ describe('UC02: Evidence Review Service', () => {
     });
   });
 
+  describe('getEvidenceDetail', () => {
+    test('[ERROR CASE] should propagate a failure loading the evidence image without querying its history', async () => {
+      createSupabaseFake(supabaseAdmin, { camera_trap_images: { data: null, error: new Error('image lookup failed') } });
+      await expect(evidenceReviewService.getEvidenceDetail(1)).rejects.toThrow('image lookup failed');
+      expect(supabaseAdmin.from).toHaveBeenCalledTimes(1);
+    });
+
+    test('[ERROR CASE] should propagate a failure loading the linked threat alerts', async () => {
+      createSupabaseFake(supabaseAdmin, {
+        camera_trap_images: { data: imageRow({ review_status: 'REVIEWED_ESCALATED' }), error: null },
+        threat_alerts: { data: null, error: new Error('threat_alerts lookup failed') }
+      });
+      await expect(evidenceReviewService.getEvidenceDetail(1)).rejects.toThrow('threat_alerts lookup failed');
+    });
+  });
+
   describe('submitReview transaction', () => {
     test('[POSITIVE CASE] should lock the image, insert the review, update status and commit in order', async () => {
       const db = createPgFake(getPool, { image: lockedImage(imageRow()) });

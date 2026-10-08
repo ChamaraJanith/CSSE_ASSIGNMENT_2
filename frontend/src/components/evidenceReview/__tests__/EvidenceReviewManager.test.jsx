@@ -315,6 +315,20 @@ describe('EvidenceReviewManager - API error handling', () => {
     expect(await screen.findByRole('table')).toBeInTheDocument();
   });
 
+  test('a server error while loading evidence details can be retried', async () => {
+    const user = await renderManager();
+    apiService.getEvidenceDetail.mockRejectedValueOnce(apiError(500, 'An unexpected error occurred while processing the evidence review request.'));
+    await user.click(screen.getByRole('button', { name: 'Review IMG-YALA02-0001' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('An unexpected error occurred');
+
+    apiService.getEvidenceDetail.mockResolvedValueOnce({ data: detail(3) });
+    await user.click(screen.getByRole('button', { name: /Retry/ }));
+
+    expect(await screen.findByText('Classify Evidence')).toBeInTheDocument();
+    expect(apiService.getEvidenceDetail).toHaveBeenCalledTimes(2);
+    expect(apiService.getEvidenceDetail).toHaveBeenLastCalledWith(3);
+  });
+
   test('409 returns to a refreshed queue explaining the evidence was already reviewed', async () => {
     const user = await renderManager();
     await openEvidence(user, 'IMG-YALA02-0001', detail(3));
