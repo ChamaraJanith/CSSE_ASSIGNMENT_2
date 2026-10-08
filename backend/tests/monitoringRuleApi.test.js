@@ -139,6 +139,27 @@ describe('UC04: Monitoring Rules API (/api/monitoring-rules)', () => {
       expect(builders.parks.eq).toHaveBeenCalledWith('id', 1);
     });
 
+    test('[POSITIVE CASE] each risk zone should carry its numeric centre (centerLat, centerLng) and radiusKm', async () => {
+      asParkManager({
+        parks: { data: yalaPark, error: null },
+        risk_zones: {
+          data: [
+            zoneRow({ id: 1, zone_code: 'RZ-YALA-01', center_lat: '6.412800', center_lng: '81.534200', radius_km: '3.20' }),
+            zoneRow({ radius_km: null })
+          ],
+          error: null
+        }
+      });
+      const res = await getReference('?parkId=1');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.riskZones.map(({ zoneCode, centerLat, centerLng, radiusKm }) => ({ zoneCode, centerLat, centerLng, radiusKm })))
+        .toEqual([
+          { zoneCode: 'RZ-YALA-01', centerLat: 6.4128, centerLng: 81.5342, radiusKm: 3.2 },
+          { zoneCode: 'RZ-YALA-02', centerLat: 6.3845, centerLng: 81.487, radiusKm: null }
+        ]);
+    });
+
     test('[EDGE CASE] a park with no risk zones should return an empty zone list', async () => {
       asParkManager({ parks: { data: yalaPark, error: null }, risk_zones: { data: [], error: null } });
       const res = await getReference();

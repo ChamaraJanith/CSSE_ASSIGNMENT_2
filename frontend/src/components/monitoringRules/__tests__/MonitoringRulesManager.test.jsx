@@ -5,7 +5,8 @@ import userEvent from '@testing-library/user-event';
 import MonitoringRulesManager from '../MonitoringRulesManager';
 import { apiService } from '../../../services/api';
 import {
-  EXISTING_RULES, OPTIONS, PARK, REFERENCE, apiError, createResponse, createdRule, deferred, invalidResult, validResult,
+  EXISTING_RULES, OPTIONS, PARK, REFERENCE, WILPATTU_PARK, WILPATTU_REFERENCE, apiError, createResponse, createdRule,
+  deferred, invalidResult, validResult,
 } from './fixtures';
 
 vi.mock('../../../services/api', () => ({
@@ -15,6 +16,21 @@ vi.mock('../../../services/api', () => ({
     validateMonitoringRule: vi.fn(),
     createMonitoringRule: vi.fn(),
   },
+}));
+
+// Leaflet cannot render in jsdom; the stub exposes the props the form passes to the map
+vi.mock('../RiskZoneMap', () => ({
+  default: ({ selectedZone, riskZones, parkName }) => (
+    <div
+      data-testid="risk-zone-map"
+      data-zone-id={selectedZone.id}
+      data-zone-code={selectedZone.zoneCode}
+      data-center={`${selectedZone.centerLat},${selectedZone.centerLng}`}
+      data-radius-km={selectedZone.radiusKm}
+      data-zone-codes={riskZones.map((zone) => zone.zoneCode).join(',')}
+      data-park-name={parkName}
+    />
+  ),
 }));
 
 // ---------- helpers ----------
@@ -213,6 +229,99 @@ describe('MonitoringRulesManager - Step 1: Hazard and Risk Zone', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Risk Zone: The selected risk zone does not belong to the selected park.');
     expect(zoneSelect()).toHaveAttribute('aria-invalid', 'true');
     await waitFor(() => expect(zoneSelect()).toHaveFocus());
+  });
+});
+
+// ---------- Step 1: Park Map / Risk Zone ----------
+
+describe('MonitoringRulesManager - Step 1: Park Map / Risk Zone', () => {
+  const MAP_PROMPT = 'Select a hazard and a risk zone to view it on the map.';
+  const riskZoneMap = () => screen.queryByTestId('risk-zone-map');
+
+  test('shows the empty-state prompt and no map until both a hazard and a risk zone are selected', async () => {
+    const user = await renderManager();
+    await startRule(user);
+
+    const panel = screen.getByRole('region', { name: 'Park map and risk zone' });
+    expect(within(panel).getByText(MAP_PROMPT)).toBeInTheDocument();
+    expect(riskZoneMap()).toBeNull();
+
+    await user.selectOptions(hazardSelect(), 'POACHING_SNARING');
+    expect(riskZoneMap()).toBeNull();
+
+    await user.selectOptions(hazardSelect(), '');
+    await user.selectOptions(zoneSelect(), '1');
+    expect(riskZoneMap()).toBeNull();
+    expect(within(panel).getByText(MAP_PROMPT)).toBeInTheDocument();
+  });
+
+  test("shows the map with the selected zone and the park's zones once both are selected", async () => {
+    const user = await renderManager();
+    await startRule(user);
+
+    await user.selectOptions(hazardSelect(), 'POACHING_SNARING');
+    await user.selectOptions(zoneSelect(), '1');
+
+    const map = riskZoneMap();
+    expect(map).toHaveAttribute('data-zone-id', '1');
+    expect(map).toHaveAttribute('data-zone-code', 'RZ-YALA-01');
+    expect(map).toHaveAttribute('data-center', '6.4128,81.5342');
+    expect(map).toHaveAttribute('data-radius-km', '3.2');
+    expect(map).toHaveAttribute('data-zone-codes', 'RZ-YALA-01,RZ-YALA-02');
+    expect(map).toHaveAttribute('data-park-name', PARK.name);
+    expect(screen.queryByText(MAP_PROMPT)).toBeNull();
+    // Zone Information is still shown next to the map
+    expect(valueOf(screen.getByText('Zone Information').parentElement, 'Zone')).toBe('RZ-YALA-01 – Northern River Basin Buffer');
+  });
+
+  test('changing the risk zone updates the map to the newly selected zone', async () => {
+    const user = await renderManager();
+    await startRule(user);
+    await user.selectOptions(hazardSelect(), 'POACHING_SNARING');
+    await user.selectOptions(zoneSelect(), '1');
+
+    await user.selectOptions(zoneSelect(), '2');
+
+    expect(screen.getAllByTestId('risk-zone-map')).toHaveLength(1);
+    expect(riskZoneMap()).toHaveAttribute('data-zone-code', 'RZ-YALA-02');
+    expect(riskZoneMap()).toHaveAttribute('data-center', '6.3845,81.487');
+    expect(riskZoneMap()).toHaveAttribute('data-radius-km', '2.8');
+  });
+
+  test("uses the selected park's own zone coordinates (Wilpattu), with no Yala fallback", async () => {
+    apiService.getMonitoringRuleReference.mockResolvedValue({ data: WILPATTU_REFERENCE });
+    const user = await renderManager({ parkId: WILPATTU_PARK.id, parkName: WILPATTU_PARK.name });
+    await startRule(user);
+
+    expect(within(zoneSelect()).queryByText(/RZ-YALA/)).toBeNull();
+    await user.selectOptions(hazardSelect(), 'LEOPARD_FEEDING_GROUND_INCURSION');
+    await user.selectOptions(zoneSelect(), '6');
+
+    const map = riskZoneMap();
+    expect(apiService.getMonitoringRuleReference).toHaveBeenCalledWith(WILPATTU_PARK.id);
+    expect(map).toHaveAttribute('data-zone-code', 'RZ-WILP-02');
+    expect(map).toHaveAttribute('data-center', '8.421,80.062');
+    expect(map).toHaveAttribute('data-radius-km', '2.5');
+    expect(map).toHaveAttribute('data-zone-codes', 'RZ-WILP-01,RZ-WILP-02');
+    expect(map).toHaveAttribute('data-park-name', WILPATTU_PARK.name);
+    expect(map.getAttribute('data-zone-codes')).not.toMatch(/YALA/);
+  });
+
+  test('Step 2 and Review do not show the Step 1 map, and it returns with the kept zone on Edit', async () => {
+    const user = await renderManager();
+    await startRule(user);
+    await completeStep1(user);
+    expect(riskZoneMap()).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Park map and risk zone' })).toBeNull();
+
+    await completeStep2(user);
+    await user.click(submitButton());
+    await screen.findByText('Step 3 of 3');
+    expect(riskZoneMap()).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await screen.findByText('Step 1 of 3');
+    expect(riskZoneMap()).toHaveAttribute('data-zone-code', 'RZ-YALA-02');
   });
 });
 

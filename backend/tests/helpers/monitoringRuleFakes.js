@@ -20,6 +20,9 @@ const zoneRow = (overrides = {}) => ({
   zone_name: 'Katagamuwa Sanctuary Boundary',
   severity_level: 'HIGH',
   primary_threat: 'Elephant Crop Raiding & Fence Breaches',
+  center_lat: 6.3845,
+  center_lng: 81.487,
+  radius_km: 2.8,
   ...overrides
 });
 

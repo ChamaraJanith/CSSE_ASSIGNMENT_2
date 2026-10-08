@@ -3,9 +3,9 @@ import {
   EMPTY_RULE_FORM, FORM_STEPS, LAST_STEP, LIST_TABS, NOT_RECORDED, REVIEW_STEP, TOTAL_STEPS,
   buildRulePayload, countByTab, describeApiError, filterByTab, findZone, firstStepWithError, formatRecipients,
   formatZone, getFieldLabel, getOptionLabel, getRuleZoneLabel, getStatusLabel, groupErrorsByField, isStepComplete,
-  orderPriorityOptions, toggleRecipient,
+  orderPriorityOptions, toZoneCircle, toggleRecipient,
 } from '../monitoringRuleUtils';
-import { EXISTING_RULES, OPTIONS, RISK_ZONES } from './fixtures';
+import { EXISTING_RULES, OPTIONS, RISK_ZONES, WILPATTU_ZONES } from './fixtures';
 
 describe('monitoringRuleUtils - steps', () => {
   test('the flow has two configuration steps followed by Review as step 3 of 3', () => {
@@ -117,5 +117,44 @@ describe('monitoringRuleUtils - display helpers', () => {
     expect(describeApiError(new TypeError('Failed to fetch'))).toMatch(/Unable to reach the monitoring rules service/);
     expect(describeApiError({ status: 409, message: 'Duplicate rule.' })).toBe('Duplicate rule.');
     expect(describeApiError({ status: 500 })).toMatch(/Something went wrong/);
+  });
+});
+
+describe('monitoringRuleUtils - risk zone map geometry', () => {
+  test('a zone with a stored centre and radius becomes a map circle at that centre', () => {
+    expect(toZoneCircle(RISK_ZONES[0])).toEqual({ center: [6.4128, 81.5342], radiusMeters: 3200 });
+    expect(toZoneCircle(WILPATTU_ZONES[0])).toEqual({ center: [8.492, 80.035], radiusMeters: 3500 });
+  });
+
+  test('the radius is converted from kilometres to metres', () => {
+    expect(toZoneCircle({ centerLat: 6.44, centerLng: 80.89, radiusKm: 2.2 }).radiusMeters).toBeCloseTo(2200);
+    expect(toZoneCircle({ centerLat: 6.44, centerLng: 80.89, radiusKm: '0.5' }).radiusMeters).toBe(500);
+  });
+
+  test('a missing zone or missing centre coordinate gives no circle', () => {
+    expect(toZoneCircle(null)).toBeNull();
+    expect(toZoneCircle(undefined)).toBeNull();
+    expect(toZoneCircle({ centerLng: 81.5, radiusKm: 2 })).toBeNull();
+    expect(toZoneCircle({ centerLat: 6.4, centerLng: null, radiusKm: 2 })).toBeNull();
+    expect(toZoneCircle({ centerLat: '', centerLng: 81.5, radiusKm: 2 })).toBeNull();
+  });
+
+  test('invalid or out-of-range centre coordinates give no circle (never a 0,0 fallback)', () => {
+    expect(toZoneCircle({ centerLat: 'abc', centerLng: 81.5, radiusKm: 2 })).toBeNull();
+    expect(toZoneCircle({ centerLat: 6.4, centerLng: Number.NaN, radiusKm: 2 })).toBeNull();
+    expect(toZoneCircle({ centerLat: 95, centerLng: 81.5, radiusKm: 2 })).toBeNull();
+    expect(toZoneCircle({ centerLat: 6.4, centerLng: 181, radiusKm: 2 })).toBeNull();
+  });
+
+  test('a null, invalid or non-positive radius keeps the centre without inventing a radius', () => {
+    [null, undefined, 'abc', 0, -1].forEach((radiusKm) => {
+      expect(toZoneCircle({ centerLat: 6.4128, centerLng: 81.5342, radiusKm })).toEqual({ center: [6.4128, 81.5342], radiusMeters: null });
+    });
+  });
+
+  test('the zone object is not mutated', () => {
+    const zone = { ...RISK_ZONES[1] };
+    toZoneCircle(zone);
+    expect(zone).toEqual(RISK_ZONES[1]);
   });
 });

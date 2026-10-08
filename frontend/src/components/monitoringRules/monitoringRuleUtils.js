@@ -84,6 +84,22 @@ export const formatZone = (zone) => (zone ? `${zone.zoneCode} – ${zone.zoneNam
 export const findZone = (riskZones, riskZoneId) =>
   (riskZones || []).find((zone) => zone.id === riskZoneId) || null;
 
+const toFiniteNumber = (value) => (isBlank(value) || !Number.isFinite(Number(value)) ? null : Number(value));
+
+/**
+ * Map geometry of a reference risk zone (centre + radius in km, as stored in risk_zones).
+ * Returns null when the centre is missing or invalid; a missing or non-positive radius gives
+ * radiusMeters null so the caller can show the centre only, without inventing a radius.
+ */
+export const toZoneCircle = (zone) => {
+  if (!zone) return null;
+  const lat = toFiniteNumber(zone.centerLat);
+  const lng = toFiniteNumber(zone.centerLng);
+  if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  const radiusKm = toFiniteNumber(zone.radiusKm);
+  return { center: [lat, lng], radiusMeters: radiusKm !== null && radiusKm > 0 ? radiusKm * 1000 : null };
+};
+
 // A rule from the list endpoint carries its joined zone; fall back to the reference zones
 export const getRuleZoneLabel = (rule, riskZones) =>
   formatZone(rule.riskZone || findZone(riskZones, rule.riskZoneId));
