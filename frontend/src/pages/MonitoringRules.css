@@ -389,6 +389,61 @@
   color: var(--cmd-text-heading);
 }
 
+/* Leaflet needs an explicit container height */
+.mr-map-canvas {
+  height: 280px;
+  width: 100%;
+  background: #030a08;
+}
+
+.mr-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 8px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.78rem;
+  color: var(--cmd-text-body);
+}
+
+.mr-map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mr-map-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--cmd-amber);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.mr-map-swatch-other {
+  border: 1px dashed #94a3b8;
+  background: transparent;
+}
+
+.mr-map .leaflet-container {
+  font-family: inherit;
+}
+
+.mr-map .mr-map-tooltip {
+  background: rgba(3, 14, 10, 0.9);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: var(--cmd-text-heading);
+  font-weight: 700;
+  font-size: 0.72rem;
+  box-shadow: none;
+}
+
+.mr-map .mr-map-tooltip::before {
+  border-top-color: rgba(52, 211, 153, 0.4);
+}
+
 .mr-actions-split {
   justify-content: space-between;
   align-items: center;
@@ -708,5 +763,9 @@
 
   .mr-state {
     padding: 24px 12px;
+  }
+
+  .mr-map-canvas {
+    height: 220px;
   }
 }

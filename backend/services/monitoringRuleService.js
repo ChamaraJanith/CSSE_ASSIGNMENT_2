@@ -28,12 +28,22 @@ const assertParkId = (parkId) => {
     }
 };
 
+// NUMERIC columns may arrive as numbers or strings; a missing or invalid value stays null (never 0)
+const toNumberOrNull = (value) => {
+    if (value === null || value === undefined || String(value).trim() === '') return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+};
+
 const toRiskZone = (row) => ({
     id: row.id,
     zoneCode: row.zone_code,
     zoneName: row.zone_name,
     severityLevel: row.severity_level,
-    primaryThreat: row.primary_threat
+    primaryThreat: row.primary_threat,
+    centerLat: toNumberOrNull(row.center_lat),
+    centerLng: toNumberOrNull(row.center_lng),
+    radiusKm: toNumberOrNull(row.radius_km)
 });
 
 const toMonitoringRule = (row) => ({
@@ -91,7 +101,7 @@ class MonitoringRuleService {
         const park = await this.findPark(parkId);
         const { data: zones, error } = await supabaseAdmin
             .from('risk_zones')
-            .select('id, zone_code, zone_name, severity_level, primary_threat')
+            .select('id, zone_code, zone_name, severity_level, primary_threat, center_lat, center_lng, radius_km')
             .eq('park_id', parkId)
             .order('zone_code', { ascending: true });
 

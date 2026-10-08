@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Info, MapPin } from 'lucide-react';
+import RiskZoneMap from './RiskZoneMap';
 import RuleStepper from './RuleStepper';
 import RuleValidationErrors from './RuleValidationErrors';
 import {
@@ -178,10 +179,14 @@ export default function RuleConfigurationForm({
                 <div className="mr-map-panel-header">
                   <MapPin size={16} /> Park Map / Risk Zone
                 </div>
-                <div className="mr-map-placeholder">
-                  <strong>{selectedZone ? formatZone(selectedZone) : parkName}</strong>
-                  <span>Map preview is not available yet: risk-zone boundaries are not part of the monitoring rule data.</span>
-                </div>
+                {form.hazardType && selectedZone ? (
+                  <RiskZoneMap selectedZone={selectedZone} riskZones={riskZones} parkName={parkName} />
+                ) : (
+                  <div className="mr-map-placeholder">
+                    <strong>{parkName}</strong>
+                    <span>Select a hazard and a risk zone to view it on the map.</span>
+                  </div>
+                )}
               </div>
             </section>
           )}

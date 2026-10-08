@@ -63,7 +63,10 @@ describe('UC04: Monitoring Rule Service', () => {
         parks: { data: yalaPark, error: null },
         risk_zones: {
           data: [
-            zoneRow({ id: 1, zone_code: 'RZ-YALA-01', zone_name: 'Northern River Basin Buffer', severity_level: 'CRITICAL', primary_threat: 'Poaching & Wire Snares near River Crossing' }),
+            zoneRow({
+              id: 1, zone_code: 'RZ-YALA-01', zone_name: 'Northern River Basin Buffer', severity_level: 'CRITICAL',
+              primary_threat: 'Poaching & Wire Snares near River Crossing', center_lat: 6.4128, center_lng: 81.5342, radius_km: 3.2
+            }),
             zoneRow()
           ],
           error: null
@@ -74,8 +77,14 @@ describe('UC04: Monitoring Rule Service', () => {
 
       expect(result.park).toEqual({ id: 1, code: 'YALA-NP', name: 'Yala National Park (Ruhuna)' });
       expect(result.riskZones).toEqual([
-        { id: 1, zoneCode: 'RZ-YALA-01', zoneName: 'Northern River Basin Buffer', severityLevel: 'CRITICAL', primaryThreat: 'Poaching & Wire Snares near River Crossing' },
-        { id: 2, zoneCode: 'RZ-YALA-02', zoneName: 'Katagamuwa Sanctuary Boundary', severityLevel: 'HIGH', primaryThreat: 'Elephant Crop Raiding & Fence Breaches' }
+        {
+          id: 1, zoneCode: 'RZ-YALA-01', zoneName: 'Northern River Basin Buffer', severityLevel: 'CRITICAL',
+          primaryThreat: 'Poaching & Wire Snares near River Crossing', centerLat: 6.4128, centerLng: 81.5342, radiusKm: 3.2
+        },
+        {
+          id: 2, zoneCode: 'RZ-YALA-02', zoneName: 'Katagamuwa Sanctuary Boundary', severityLevel: 'HIGH',
+          primaryThreat: 'Elephant Crop Raiding & Fence Breaches', centerLat: 6.3845, centerLng: 81.487, radiusKm: 2.8
+        }
       ]);
       expect(result.options).toEqual({
         hazardTypes: monitoringRuleConfig.HAZARD_TYPES,
@@ -86,6 +95,53 @@ describe('UC04: Monitoring Rule Service', () => {
       expect(builders.parks.eq).toHaveBeenCalledWith('id', 1);
       expect(builders.risk_zones.eq).toHaveBeenCalledWith('park_id', 1);
       expect(builders.risk_zones.order).toHaveBeenCalledWith('zone_code', { ascending: true });
+    });
+
+    test('[POSITIVE CASE] should select the zone centre and radius columns', async () => {
+      const builders = createSupabaseFake(supabaseAdmin, { parks: { data: yalaPark, error: null }, risk_zones: { data: [zoneRow()], error: null } });
+      await monitoringRuleService.getReferenceData(1);
+
+      const columns = builders.risk_zones.select.mock.calls[0][0].split(',').map((column) => column.trim());
+      expect(columns).toEqual(expect.arrayContaining(['center_lat', 'center_lng', 'radius_km']));
+    });
+
+    test('[POSITIVE CASE] NUMERIC coordinates returned as strings should be converted to numbers', async () => {
+      createSupabaseFake(supabaseAdmin, {
+        parks: { data: yalaPark, error: null },
+        risk_zones: { data: [zoneRow({ center_lat: '8.492000', center_lng: '80.035000', radius_km: '3.50' })], error: null }
+      });
+
+      const { riskZones: [zone] } = await monitoringRuleService.getReferenceData(1);
+
+      expect(zone).toMatchObject({ centerLat: 8.492, centerLng: 80.035, radiusKm: 3.5 });
+    });
+
+    test.each([
+      ['null', null],
+      ['missing', undefined],
+      ['blank', '  '],
+      ['non-numeric', 'abc']
+    ])('[EDGE CASE] a %s radius should be returned as null, never invented or 0', async (_label, radius) => {
+      createSupabaseFake(supabaseAdmin, {
+        parks: { data: yalaPark, error: null },
+        risk_zones: { data: [zoneRow({ radius_km: radius })], error: null }
+      });
+
+      const { riskZones: [zone] } = await monitoringRuleService.getReferenceData(1);
+
+      expect(zone.radiusKm).toBeNull();
+      expect(zone).toMatchObject({ centerLat: 6.3845, centerLng: 81.487 });
+    });
+
+    test('[EDGE CASE] missing or invalid centre coordinates should be returned as null', async () => {
+      createSupabaseFake(supabaseAdmin, {
+        parks: { data: yalaPark, error: null },
+        risk_zones: { data: [zoneRow({ center_lat: null, center_lng: 'NaN' })], error: null }
+      });
+
+      const { riskZones: [zone] } = await monitoringRuleService.getReferenceData(1);
+
+      expect(zone).toMatchObject({ centerLat: null, centerLng: null, radiusKm: 2.8 });
     });
 
     test('[EDGE CASE] a park with no risk zones should return an empty zone list', async () => {

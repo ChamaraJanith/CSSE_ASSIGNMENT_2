@@ -1,5 +1,6 @@
 // UC04 test data mirroring the real API responses: option lists and labels are those of
-// backend/utils/monitoringRuleConfig.js; risk zones are the seeded Yala zones (02_seed_data.sql).
+// backend/utils/monitoringRuleConfig.js; risk zones are the seeded Yala zones (02_seed_data.sql)
+// and Wilpattu zones (seed_other_parks.js), with their stored centre and radius.
 
 export const PARK = { id: 1, code: 'YALA-NP', name: 'Yala National Park (Ruhuna)' };
 
@@ -7,10 +8,27 @@ export const RISK_ZONES = [
   {
     id: 1, zoneCode: 'RZ-YALA-01', zoneName: 'Northern River Basin Buffer',
     severityLevel: 'CRITICAL', primaryThreat: 'Poaching & Wire Snares near River Crossing',
+    centerLat: 6.4128, centerLng: 81.5342, radiusKm: 3.2,
   },
   {
     id: 2, zoneCode: 'RZ-YALA-02', zoneName: 'Katagamuwa Sanctuary Boundary',
     severityLevel: 'HIGH', primaryThreat: 'Elephant Crop Raiding & Fence Breaches',
+    centerLat: 6.3845, centerLng: 81.487, radiusKm: 2.8,
+  },
+];
+
+export const WILPATTU_PARK = { id: 2, code: 'WILP-NP', name: 'Wilpattu National Park' };
+
+export const WILPATTU_ZONES = [
+  {
+    id: 5, zoneCode: 'RZ-WILP-01', zoneName: 'Kokmote Sandstone River Buffer',
+    severityLevel: 'CRITICAL', primaryThreat: 'Poaching & Illegal Snaring along Riverbank',
+    centerLat: 8.492, centerLng: 80.035, radiusKm: 3.5,
+  },
+  {
+    id: 6, zoneCode: 'RZ-WILP-02', zoneName: 'Maradanmaduwa Willu Sanctuary',
+    severityLevel: 'HIGH', primaryThreat: 'Night Incursions into Leopard Feeding Grounds',
+    centerLat: 8.421, centerLng: 80.062, radiusKm: 2.5,
   },
 ];
 
@@ -41,6 +59,8 @@ export const OPTIONS = {
 };
 
 export const REFERENCE = { park: PARK, riskZones: RISK_ZONES, options: OPTIONS };
+
+export const WILPATTU_REFERENCE = { park: WILPATTU_PARK, riskZones: WILPATTU_ZONES, options: OPTIONS };
 
 const CREATED_AT = '2026-10-08T02:00:00.000Z';
 
