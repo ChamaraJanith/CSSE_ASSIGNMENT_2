@@ -311,23 +311,80 @@
   border-color: rgba(239, 68, 68, 0.5);
 }
 
-/* --- Detail / classification --- */
-.er-detail-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 22px;
-}
-
-@media (max-width: 1000px) {
-  .er-detail-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.er-detail-side {
+/* --- Classify Evidence: Evidence Summary card (UC02 hi-fi wireframe) --- */
+.er-evidence-card {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid var(--cmd-border);
+  background: var(--cmd-bg-card);
+}
+
+.er-evidence-card .er-section-title {
+  margin: 0;
+}
+
+.er-evidence-card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.er-evidence-info {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.er-classify .er-image-frame {
+  min-height: 220px;
+}
+
+.er-classify .er-image {
+  max-height: 320px;
+}
+
+.er-capture-metadata {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+}
+
+.er-capture-metadata h4 {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cmd-text-muted);
+}
+
+.er-capture-metadata dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px 16px;
+}
+
+.er-capture-metadata dt {
+  font-size: 0.72rem;
+  color: var(--cmd-text-muted);
+}
+
+.er-capture-metadata dd {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--cmd-text-body);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .er-evidence-card-body {
+    grid-template-columns: 1fr;
+  }
 }
 
 .er-summary {
@@ -433,46 +490,113 @@
   border: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .er-classification legend {
-  margin-bottom: 8px;
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 0.95rem;
   font-weight: 700;
   color: var(--cmd-text-heading);
 }
 
-.er-option {
+/* --- Classification cards: icon + title + description, one selectable --- */
+.er-class-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.er-class-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px;
-  border-radius: 10px;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 16px 18px;
+  border-radius: 12px;
   border: 1px solid var(--cmd-border);
   background: var(--cmd-bg-card);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.er-class-card:hover {
+  border-color: var(--cmd-border-hover);
+}
+
+.er-class-card.selected {
+  border-color: var(--cmd-emerald);
+  background: rgba(16, 185, 129, 0.1);
+  box-shadow: 0 0 0 1px var(--cmd-emerald), 0 6px 20px var(--cmd-emerald-glow);
+}
+
+.er-class-card input {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--cmd-emerald);
   cursor: pointer;
 }
 
-.er-option.selected {
-  border-color: var(--cmd-emerald);
-  box-shadow: 0 0 0 1px var(--cmd-emerald-glow);
+.er-class-card-icon {
+  color: var(--cmd-text-body);
 }
 
-.er-option input {
-  align-self: flex-start;
-  accent-color: var(--cmd-emerald);
+.er-class-card.selected .er-class-card-icon {
+  color: var(--cmd-emerald-bright);
 }
 
-.er-option-label {
+.er-class-card-title {
   font-weight: 700;
   color: var(--cmd-text-heading);
 }
 
-.er-option-hint {
-  font-size: 0.75rem;
+.er-class-card-description {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--cmd-text-body);
+}
+
+.er-class-card-outcome {
+  font-size: 0.72rem;
   color: var(--cmd-text-muted);
+}
+
+.er-classification:disabled .er-class-card {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* --- Notes with character counter --- */
+.er-notes-field textarea {
+  resize: vertical;
+}
+
+.er-notes-optional {
+  font-weight: 400;
+  color: var(--cmd-text-muted);
+}
+
+.er-char-counter {
+  align-self: flex-end;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--cmd-text-muted);
+}
+
+.er-classify-actions .btn-tactical {
+  min-width: 160px;
 }
 
 .er-field {

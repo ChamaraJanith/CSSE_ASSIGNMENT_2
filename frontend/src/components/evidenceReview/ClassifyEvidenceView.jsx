@@ -1,18 +1,37 @@
 import React from 'react';
-import { ArrowLeft, AlertTriangle, History, Siren, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, History, Siren, CheckCircle2, PawPrint, User, HelpCircle } from 'lucide-react';
 import EvidenceImage from './EvidenceImage';
 import ReviewStatusBadge from './ReviewStatusBadge';
 import {
-  CLASSIFICATIONS, IMAGE_STATUS, REVIEW_STATUSES, formatDateTime, formatLocation, formatValue,
+  CLASSIFICATIONS, IMAGE_STATUS, NOTES_MAX_LENGTH, REVIEW_STATUSES, formatDateTime, formatLocation, formatValue,
   getClassificationLabel, getMissingMetadataLabels,
 } from './evidenceReviewUtils';
 
 const CLASSIFICATION_OPTIONS = [
-  { value: CLASSIFICATIONS.WILDLIFE_SPECIES, hint: 'Animal identified. Recorded as Reviewed, no alert.' },
-  { value: CLASSIFICATIONS.SUSPICIOUS_PERSON, hint: 'Possible poaching activity. Requires escalation confirmation.' },
-  { value: CLASSIFICATIONS.UNKNOWN, hint: 'Cannot be identified. Kept available for secondary review.' },
+  {
+    value: CLASSIFICATIONS.WILDLIFE_SPECIES,
+    icon: PawPrint,
+    description: 'Evidence contains identifiable wildlife in its natural habitat.',
+    outcome: 'Recorded as Reviewed. No alert.',
+  },
+  {
+    value: CLASSIFICATIONS.SUSPICIOUS_PERSON,
+    icon: User,
+    description: 'Evidence of human presence that may indicate suspicious activity.',
+    outcome: 'Requires escalation confirmation.',
+  },
+  {
+    value: CLASSIFICATIONS.UNKNOWN,
+    icon: HelpCircle,
+    description: 'Unable to classify the evidence with confidence.',
+    outcome: 'Kept for secondary review.',
+  },
 ];
 
+const NOTES_ID = 'er-review-notes';
+const NOTES_COUNTER_ID = 'er-review-notes-counter';
+
+// Key fields shown in the wireframe's Evidence Summary card
 export function EvidenceSummary({ evidence }) {
   const { metadata = {}, cameraTrap } = evidence;
   const rows = [
@@ -20,11 +39,6 @@ export function EvidenceSummary({ evidence }) {
     ['Camera ID', cameraTrap?.trapCode],
     ['Location', formatLocation(cameraTrap)],
     ['Captured', formatDateTime(metadata.capturedAt)],
-    ['Latitude', formatValue(metadata.latitude)],
-    ['Longitude', formatValue(metadata.longitude)],
-    ['Camera Model', formatValue(metadata.cameraModel)],
-    ['Trigger Type', formatValue(metadata.triggerType)],
-    ['Ambient Temperature', formatValue(metadata.ambientTemperatureC, ' °C')],
   ];
 
   return (
@@ -40,6 +54,31 @@ export function EvidenceSummary({ evidence }) {
         <dd><ReviewStatusBadge status={evidence.reviewStatus} /></dd>
       </div>
     </dl>
+  );
+}
+
+// Remaining capture metadata, kept available as secondary information
+function CaptureMetadata({ metadata = {} }) {
+  const rows = [
+    ['Latitude', formatValue(metadata.latitude)],
+    ['Longitude', formatValue(metadata.longitude)],
+    ['Camera Model', formatValue(metadata.cameraModel)],
+    ['Trigger Type', formatValue(metadata.triggerType)],
+    ['Ambient Temperature', formatValue(metadata.ambientTemperatureC, ' °C')],
+  ];
+
+  return (
+    <div className="er-capture-metadata">
+      <h4>Capture Metadata</h4>
+      <dl>
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
@@ -78,6 +117,31 @@ function ReviewHistory({ reviews, threatAlerts }) {
   );
 }
 
+function ClassificationCard({ option, selected, onSelect }) {
+  const Icon = option.icon;
+  const titleId = `er-class-${option.value}-title`;
+  const descriptionId = `er-class-${option.value}-description`;
+  return (
+    <label className={`er-class-card ${selected ? 'selected' : ''}`}>
+      <input
+        type="radio"
+        name="classification"
+        value={option.value}
+        checked={selected}
+        onChange={() => onSelect(option.value)}
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+      />
+      <Icon size={30} className="er-class-card-icon" aria-hidden="true" />
+      <span id={titleId} className="er-class-card-title">{getClassificationLabel(option.value)}</span>
+      <span id={descriptionId} className="er-class-card-description">
+        {option.description}
+        <span className="er-class-card-outcome">{option.outcome}</span>
+      </span>
+    </label>
+  );
+}
+
 export default function ClassifyEvidenceView({
   evidence, classification, notes, imageStatus, submitting, error,
   onClassificationChange, onNotesChange, onImageStatusChange, onCancel, onConfirm, onBackToQueue,
@@ -89,7 +153,7 @@ export default function ClassifyEvidenceView({
   const canConfirm = Boolean(classification) && !submitting && imageReady;
 
   return (
-    <div className="panel-card er-panel">
+    <div className="panel-card er-panel er-classify">
       <div className="panel-header">
         <div className="panel-title">{evidence.isReviewable ? 'Classify Evidence' : 'Evidence Details'}</div>
         <button type="button" className="btn-tactical btn-tactical-secondary" onClick={onBackToQueue}>
@@ -103,24 +167,26 @@ export default function ClassifyEvidenceView({
         </div>
       )}
 
-      <div className="er-detail-grid">
-        <div>
-          <EvidenceImage
-            key={evidence.id}
-            src={evidence.imageUrl}
-            alt={`Camera-trap evidence ${evidence.imageCode}`}
-            onStatusChange={onImageStatusChange}
-            onBackToQueue={onBackToQueue}
-          />
+      <section className="er-evidence-card" aria-labelledby="er-evidence-summary-title">
+        <h3 id="er-evidence-summary-title" className="er-section-title">Evidence Summary</h3>
+        <div className="er-evidence-card-body">
+          <div className="er-evidence-media">
+            <EvidenceImage
+              key={evidence.id}
+              src={evidence.imageUrl}
+              alt={`Camera-trap evidence ${evidence.imageCode}`}
+              onStatusChange={onImageStatusChange}
+              onBackToQueue={onBackToQueue}
+            />
+          </div>
+          <div className="er-evidence-info">
+            <EvidenceSummary evidence={evidence} />
+            <CaptureMetadata metadata={evidence.metadata} />
+          </div>
         </div>
-
-        <div className="er-detail-side">
-          <h3 className="er-section-title">Evidence Summary</h3>
-          <EvidenceSummary evidence={evidence} />
-          {evidence.metadataIncomplete && <MetadataWarning missingFields={evidence.missingMetadataFields} />}
-          <ReviewHistory reviews={reviews} threatAlerts={threatAlerts} />
-        </div>
-      </div>
+        {evidence.metadataIncomplete && <MetadataWarning missingFields={evidence.missingMetadataFields} />}
+        <ReviewHistory reviews={reviews} threatAlerts={threatAlerts} />
+      </section>
 
       {evidence.isReviewable ? (
         <form
@@ -132,38 +198,42 @@ export default function ClassifyEvidenceView({
         >
           <fieldset className="er-classification" disabled={submitting}>
             <legend>Classification</legend>
-            {CLASSIFICATION_OPTIONS.map((option) => (
-              <label key={option.value} className={`er-option ${classification === option.value ? 'selected' : ''}`}>
-                <input
-                  type="radio"
-                  name="classification"
-                  value={option.value}
-                  checked={classification === option.value}
-                  onChange={() => onClassificationChange(option.value)}
+            <p className="er-muted">Select the most appropriate classification for this evidence.</p>
+            <div className="er-class-cards">
+              {CLASSIFICATION_OPTIONS.map((option) => (
+                <ClassificationCard
+                  key={option.value}
+                  option={option}
+                  selected={classification === option.value}
+                  onSelect={onClassificationChange}
                 />
-                <span className="er-option-label">{getClassificationLabel(option.value)}</span>
-                <span className="er-option-hint">{option.hint}</span>
-              </label>
-            ))}
+              ))}
+            </div>
           </fieldset>
 
-          <label className="er-field">
-            Notes (optional)
+          <div className="er-field er-notes-field">
+            <label htmlFor={NOTES_ID}>
+              Notes <span className="er-notes-optional">(optional)</span>
+            </label>
             <textarea
+              id={NOTES_ID}
               value={notes}
               onChange={(event) => onNotesChange(event.target.value)}
               placeholder="Add any observations about this evidence"
               rows={3}
+              maxLength={NOTES_MAX_LENGTH}
+              aria-describedby={NOTES_COUNTER_ID}
               disabled={submitting}
             />
-          </label>
+            <span id={NOTES_COUNTER_ID} className="er-char-counter">{notes.length} / {NOTES_MAX_LENGTH}</span>
+          </div>
 
           {imageStatus === IMAGE_STATUS.ERROR && (
             <p className="er-inline-error">The image must load before this evidence can be reviewed.</p>
           )}
           {error && <p className="er-inline-error" role="alert">{error}</p>}
 
-          <div className="er-actions er-actions-end">
+          <div className="er-actions er-actions-end er-classify-actions">
             <button type="button" className="btn-tactical btn-tactical-secondary" onClick={onCancel} disabled={submitting}>
               Cancel
             </button>

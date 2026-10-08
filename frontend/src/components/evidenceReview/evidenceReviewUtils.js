@@ -23,6 +23,8 @@ export const QUEUE_TABS = Object.freeze({
 export const IMAGE_STATUS = Object.freeze({ LOADING: 'loading', LOADED: 'loaded', ERROR: 'error' });
 
 export const ALL_STATUSES = 'ALL';
+// UI limit for optional review notes (wireframe "0 / 500" counter)
+export const NOTES_MAX_LENGTH = 500;
 export const NOT_RECORDED = 'Not recorded';
 
 const STATUS_LABELS = {
