@@ -11,6 +11,7 @@ import { supabase } from '../supabaseClient';
 import { apiService } from '../services/api';
 import PatrolPlanningManager from '../components/patrolPlanning/PatrolPlanningManager';
 import TacticalMap from '../components/patrolPlanning/TacticalMap';
+import MonitoringRulesManager from '../components/monitoringRules/MonitoringRulesManager';
 import './Login.css';
 import './Dashboard.css';
 
@@ -518,6 +519,14 @@ export default function ParkManagerDashboard() {
             <Settings className="sidebar-item-icon" />
             <span>Park Settings</span>
           </li>
+
+          <li
+            className={`sidebar-item ${activeMenu === 'monitoring_rules' ? 'active' : ''}`}
+            onClick={() => setActiveMenu('monitoring_rules')}
+          >
+            <Shield className="sidebar-item-icon" />
+            <span>Monitoring Rules</span>
+          </li>
         </ul>
 
         {/* Live Grid Indicator in Sidebar Footer */}
@@ -550,6 +559,7 @@ export default function ParkManagerDashboard() {
                activeMenu === 'overview' ? 'National Park Operations Command Center' :
                activeMenu === 'view_officers' ? 'Field Ranger Personnel & Deployment Roster' :
                activeMenu === 'add_officer' ? 'New Wildlife Officer Registration' :
+               activeMenu === 'monitoring_rules' ? 'Park-Specific Wildlife Monitoring Rules' :
                'Park Configuration & Telemetry Thresholds'}
             </div>
             <div className="header-subtitle">
@@ -595,6 +605,15 @@ export default function ParkManagerDashboard() {
           {/* 1. Main UC01 Patrol Planning Console */}
           {activeMenu === 'patrol_planning' && (
             <PatrolPlanningManager parkId={currentParkId} />
+          )}
+
+          {/* UC04 Monitoring Rules: uses the park chosen in the header selector; remounts when it changes */}
+          {activeMenu === 'monitoring_rules' && (
+            <MonitoringRulesManager
+              key={currentParkId}
+              parkId={currentParkId}
+              parkName={availableParks.find(p => p.id === currentParkId)?.name}
+            />
           )}
 
           {/* 2. Operations Overview Screen */}

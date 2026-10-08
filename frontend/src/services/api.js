@@ -2,6 +2,16 @@ import { supabase } from '../supabaseClient';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
+// UC04: only these rule fields are sent; values are passed through unchanged (no type coercion)
+const MONITORING_RULE_FIELDS = [
+  'parkId', 'hazardType', 'riskZoneId', 'alertPriority', 'notificationRecipients', 'responseBehaviour', 'notes'
+];
+
+const toMonitoringRulePayload = (ruleData) => {
+  const source = ruleData || {};
+  return Object.fromEntries(MONITORING_RULE_FIELDS.filter((field) => field in source).map((field) => [field, source[field]]));
+};
+
 class ApiService {
   async fetchWithHandleError(url, options = {}) {
     try {
@@ -18,7 +28,12 @@ class ApiService {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'API request failed');
+        const requestError = new Error(data.error || 'API request failed');
+        requestError.status = response.status;
+        // Structured details (e.g. UC04 field errors / rule conflicts) are kept when the API sends them
+        if (Array.isArray(data.errors)) requestError.errors = data.errors;
+        if (Array.isArray(data.conflicts)) requestError.conflicts = data.conflicts;
+        throw requestError;
       }
       return data;
     } catch (error) {
@@ -166,6 +181,81 @@ class ApiService {
   async deleteStagingPost(id) {
     return this.fetchWithHandleError(`/patrol-planning/staging-posts/${id}`, {
       method: 'DELETE'
+    });
+  }
+
+  // --- Evidence Review APIs (UC02) ---
+  async getEvidenceReviewQueue(status = 'ALL', search = '') {
+    const params = new URLSearchParams({ status });
+    if (search) params.append('search', search);
+    return this.fetchWithHandleError(`/evidence-review/queue?${params.toString()}`);
+  }
+
+  async getEvidenceDetail(imageId) {
+    return this.fetchWithHandleError(`/evidence-review/${encodeURIComponent(imageId)}`);
+  }
+
+  async submitEvidenceReview(imageId, payload) {
+    return this.fetchWithHandleError(`/evidence-review/${encodeURIComponent(imageId)}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  // --- Incidents APIs ---
+  async getIncidents() {
+    return this.fetchWithHandleError('/incidents');
+  }
+
+  async createIncident(payload) {
+    return this.fetchWithHandleError('/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async updateIncident(id, payload) {
+    return this.fetchWithHandleError(`/incidents/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async deleteIncident(id) {
+    return this.fetchWithHandleError(`/incidents/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- Monitoring Rules APIs (UC04) ---
+  async getMonitoringRuleReference(parkId) {
+    const params = new URLSearchParams({ parkId: String(parkId) });
+    return this.fetchWithHandleError(`/monitoring-rules/reference?${params.toString()}`);
+  }
+
+  async getMonitoringRules(parkId) {
+    const params = new URLSearchParams({ parkId: String(parkId) });
+    return this.fetchWithHandleError(`/monitoring-rules?${params.toString()}`);
+  }
+
+  // Dry run: sends only the rule configuration; the final action is chosen later on the review screen
+  async validateMonitoringRule(ruleData) {
+    return this.fetchWithHandleError('/monitoring-rules/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(toMonitoringRulePayload(ruleData))
+    });
+  }
+
+  // action: 'ACTIVATE' | 'SAVE_DRAFT'. Status, creator and activation time are set by the backend.
+  async createMonitoringRule(ruleData, action) {
+    return this.fetchWithHandleError('/monitoring-rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...toMonitoringRulePayload(ruleData), action })
     });
   }
 }

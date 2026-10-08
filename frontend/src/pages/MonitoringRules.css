@@ -1,0 +1,712 @@
+/* ==============================================================================
+   WildGuard - UC04 Configure Park-Specific Wildlife Monitoring Rules
+   Builds on the palette and panel/table/button/stepper classes in PatrolPlanning.css
+   ============================================================================== */
+
+.mr-container {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  color: var(--cmd-text-body);
+}
+
+.mr-panel {
+  animation: consoleFadeIn 0.25s ease-out;
+}
+
+.mr-panel-header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mr-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--cmd-text-heading);
+}
+
+.mr-muted {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--cmd-text-muted);
+}
+
+.mr-code {
+  font-family: monospace;
+  font-weight: 700;
+  color: var(--cmd-emerald-bright);
+}
+
+/* --- Selected park (from the dashboard park selector) --- */
+.mr-park-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--cmd-border);
+  background: rgba(4, 20, 15, 0.75);
+  color: var(--cmd-emerald-bright);
+}
+
+.mr-park-banner > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.mr-park-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cmd-text-muted);
+}
+
+.mr-park-banner strong {
+  color: var(--cmd-text-heading);
+  font-size: 0.95rem;
+}
+
+.mr-park-hint {
+  margin-left: auto;
+}
+
+/* --- Tabs & list --- */
+.mr-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mr-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--cmd-text-muted);
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mr-tab.active {
+  color: var(--cmd-text-heading);
+  border-bottom-color: var(--cmd-emerald);
+}
+
+.mr-tab-count {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.75rem;
+}
+
+.mr-table-wrapper {
+  overflow-x: auto;
+}
+
+.mr-table {
+  min-width: 860px;
+}
+
+/* --- Status badges --- */
+.mr-status-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.mr-status-active {
+  background: rgba(16, 185, 129, 0.14);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.mr-status-draft {
+  background: rgba(6, 182, 212, 0.14);
+  color: #a5f3fc;
+  border-color: rgba(6, 182, 212, 0.45);
+}
+
+.mr-status-inactive,
+.mr-status-unknown {
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+/* --- Configuration form --- */
+.mr-step-button {
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.mr-step-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.mr-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mr-form-body {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.mr-choice-group {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mr-choice-group legend {
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: var(--cmd-text-heading);
+}
+
+.mr-required {
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--cmd-text-muted);
+}
+
+.mr-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.mr-option {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--cmd-border);
+  background: var(--cmd-bg-card);
+  cursor: pointer;
+}
+
+.mr-option.selected {
+  border-color: var(--cmd-emerald);
+  box-shadow: 0 0 0 1px var(--cmd-emerald-glow);
+}
+
+.mr-option input {
+  align-self: flex-start;
+  accent-color: var(--cmd-emerald);
+}
+
+.mr-option-label {
+  font-weight: 700;
+  color: var(--cmd-text-heading);
+}
+
+.mr-option-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mr-option-hint {
+  font-size: 0.75rem;
+  color: var(--cmd-text-muted);
+}
+
+.mr-step-indicator {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cmd-text-muted);
+}
+
+.mr-step-pending {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.mr-step-pending:hover {
+  color: var(--cmd-text-muted);
+  background: transparent;
+}
+
+/* --- Step 1: Hazard and Risk Zone (storyboard layout) --- */
+.mr-step-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mr-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mr-park-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--cmd-border);
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--cmd-emerald-bright);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.mr-step1-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.mr-step1-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.mr-info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--cmd-border);
+  background: var(--cmd-bg-card);
+}
+
+.mr-info-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cmd-emerald-bright);
+}
+
+.mr-info-list {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.mr-info-list > div {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  font-size: 0.82rem;
+}
+
+.mr-info-list dt {
+  color: var(--cmd-text-muted);
+}
+
+.mr-info-list dd {
+  margin: 0;
+  color: var(--cmd-text-heading);
+  overflow-wrap: anywhere;
+}
+
+.mr-info-subtitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cmd-text-muted);
+}
+
+.mr-info-threats ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.mr-map-panel {
+  border-radius: 12px;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  background: rgba(4, 20, 15, 0.75);
+  overflow: hidden;
+}
+
+.mr-map-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cmd-text-heading);
+}
+
+.mr-map-placeholder {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--cmd-text-muted);
+  background-image:
+    linear-gradient(rgba(52, 211, 153, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.mr-map-placeholder strong {
+  color: var(--cmd-text-heading);
+}
+
+.mr-actions-split {
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* --- Step 2: Priority & Notifications (storyboard layout) --- */
+.mr-priority-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.mr-option-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.mr-option-inline input {
+  align-self: center;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.mr-field-narrow {
+  max-width: 420px;
+}
+
+.mr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cmd-text-heading);
+}
+
+.mr-field select,
+.mr-field textarea {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--cmd-border);
+  border-radius: 9px;
+  color: var(--cmd-text-heading);
+  padding: 8px 10px;
+  font: inherit;
+  font-weight: 400;
+}
+
+.mr-field select option {
+  background: #06140f;
+}
+
+.mr-field [aria-invalid='true'] {
+  border-color: var(--cmd-red);
+}
+
+.mr-field-error,
+.mr-inline-error {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* --- Validation errors & conflicts --- */
+.mr-validation {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fecaca;
+  font-size: 0.85rem;
+}
+
+.mr-validation:focus {
+  outline: 2px solid rgba(239, 68, 68, 0.6);
+  outline-offset: 2px;
+}
+
+.mr-validation-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #fca5a5;
+}
+
+.mr-validation-body {
+  min-width: 0;
+}
+
+.mr-validation-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mr-validation-field {
+  font-weight: 700;
+  color: var(--cmd-text-heading);
+}
+
+.mr-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  color: #a5f3fc;
+}
+
+/* --- Review & result summary --- */
+.mr-summary {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.mr-summary-row {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.mr-summary-row dt {
+  color: var(--cmd-text-muted);
+}
+
+.mr-summary-row dd {
+  margin: 0;
+  color: var(--cmd-text-heading);
+  overflow-wrap: anywhere;
+}
+
+/* --- Review (Step 3 of 3, storyboard layout) --- */
+.mr-review-intro {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--cmd-text-body);
+}
+
+.mr-review-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--cmd-border);
+  background: var(--cmd-bg-card);
+}
+
+.mr-review-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mr-edit-button {
+  padding: 7px 14px;
+  font-size: 0.8rem;
+}
+
+.mr-result-header {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  color: var(--cmd-emerald-bright);
+}
+
+.mr-result-header h2 {
+  margin: 0;
+  color: var(--cmd-text-heading);
+}
+
+.mr-result-header p {
+  margin: 4px 0 0;
+  color: var(--cmd-text-body);
+}
+
+/* --- Result / confirmation --- */
+.mr-result-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.mr-result-status.is-active {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.mr-result-status-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mr-status-badge-lg {
+  padding: 6px 16px;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+}
+
+.mr-result-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  font-size: 0.82rem;
+}
+
+.mr-result-meta dt {
+  color: var(--cmd-text-muted);
+}
+
+.mr-result-meta dd {
+  margin: 2px 0 0;
+  color: var(--cmd-text-heading);
+}
+
+/* --- Actions & states --- */
+.mr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mr-actions-end {
+  justify-content: flex-end;
+}
+
+.mr-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 36px;
+  text-align: center;
+  color: var(--cmd-text-muted);
+}
+
+.mr-state p {
+  margin: 0;
+}
+
+.mr-state-error {
+  color: #fca5a5;
+}
+
+.mr-reference-error {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.mr-spin {
+  animation: mrSpin 1s linear infinite;
+}
+
+@keyframes mrSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Responsive --- */
+@media (max-width: 900px) {
+  .mr-step1-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mr-field-narrow {
+    max-width: none;
+  }
+
+  .mr-park-hint {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .mr-summary-row,
+  .mr-info-list > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .mr-actions-split > .mr-actions {
+    flex: 1 1 100%;
+  }
+
+  .mr-actions-end {
+    justify-content: stretch;
+  }
+
+  .mr-actions .btn-tactical {
+    flex: 1 1 100%;
+  }
+
+  .mr-state {
+    padding: 24px 12px;
+  }
+}
