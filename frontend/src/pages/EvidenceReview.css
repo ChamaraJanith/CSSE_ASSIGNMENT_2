@@ -31,11 +31,19 @@
   color: var(--cmd-emerald-bright);
 }
 
-/* --- Tabs & toolbar --- */
+/* --- Review queue: tabs + search/filter share one control row (UC02 hi-fi wireframe) --- */
+.er-queue-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .er-tabs {
   display: flex;
   gap: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .er-tab {
@@ -62,15 +70,18 @@
 }
 
 .er-toolbar {
+  flex: 1 1 420px;
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 12px;
   align-items: center;
+  padding-bottom: 10px;
 }
 
 .er-search {
-  flex: 1;
-  min-width: 220px;
+  flex: 0 1 280px;
+  min-width: 200px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -108,6 +119,95 @@
 
 .er-table-wrapper {
   overflow-x: auto;
+}
+
+.er-queue .tactical-table td {
+  vertical-align: middle;
+}
+
+/* Larger thumbnails and uppercase status badges, as in the queue wireframe */
+.er-queue .er-thumbnail {
+  width: 88px;
+  height: 60px;
+}
+
+.er-queue .er-status-badge {
+  text-transform: uppercase;
+}
+
+.er-queue .er-status-unreviewed {
+  background: rgba(249, 115, 22, 0.14);
+  color: #fdba74;
+  border-color: rgba(249, 115, 22, 0.5);
+}
+
+/* --- Review queue footer: results count + pagination --- */
+.er-queue-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.er-results-count {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cmd-text-muted);
+}
+
+.er-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.er-page-btn {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--cmd-text-heading);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.er-page-btn:hover:not(:disabled) {
+  border-color: var(--cmd-border-hover);
+}
+
+.er-page-btn.active {
+  background: var(--cmd-emerald);
+  border-color: var(--cmd-emerald);
+  color: #fff;
+}
+
+.er-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.er-page-gap {
+  padding: 0 4px;
+  color: var(--cmd-text-muted);
+}
+
+@media (max-width: 640px) {
+  .er-toolbar {
+    justify-content: stretch;
+  }
+
+  .er-search {
+    flex: 1 1 100%;
+  }
 }
 
 /* --- Images --- */
