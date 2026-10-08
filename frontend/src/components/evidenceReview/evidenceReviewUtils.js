@@ -86,6 +86,55 @@ export const filterBySearch = (items, search) => {
 export const applyQueueFilters = (items, { tab = QUEUE_TABS.UNREVIEWED, status = ALL_STATUSES, search = '' } = {}) =>
   filterBySearch(filterByStatus(filterByTab(items, tab), status), search);
 
+// Capture time as epoch ms, or null when it is missing or unparseable
+const getCaptureTime = (item) => {
+  const value = item?.metadata?.capturedAt;
+  if (isBlank(value)) return null;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? null : time;
+};
+
+// Newest capture first; evidence without a usable capture time goes last (stable order among ties)
+export const sortByCaptureTimeDesc = (items) =>
+  [...items].sort((a, b) => {
+    const timeA = getCaptureTime(a);
+    const timeB = getCaptureTime(b);
+    if (timeA === timeB) return 0;
+    if (timeA === null) return 1;
+    if (timeB === null) return -1;
+    return timeB - timeA;
+  });
+
+export const QUEUE_PAGE_SIZE = 5;
+
+// Clamps the requested page into the valid range, so a page that no longer exists falls back to the last one
+export const paginate = (items, page, pageSize = QUEUE_PAGE_SIZE) => {
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+  const pageItems = items.slice(startIndex, startIndex + pageSize);
+  return {
+    pageItems,
+    currentPage,
+    totalPages,
+    total,
+    from: total === 0 ? 0 : startIndex + 1,
+    to: startIndex + pageItems.length,
+  };
+};
+
+export const PAGE_GAP = 'gap';
+
+// Page buttons like the wireframe: 1 2 3 … 7. Up to 7 pages are all shown; otherwise first, last and current ±1.
+export const getPageNumbers = (currentPage, totalPages) => {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  const pages = [...new Set([1, currentPage - 1, currentPage, currentPage + 1, totalPages])]
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((a, b) => a - b);
+  return pages.flatMap((page, index) => (index > 0 && page - pages[index - 1] > 1 ? [PAGE_GAP, page] : [page]));
+};
+
 export const getMissingMetadataLabels = (fields = []) =>
   fields.map((field) => MISSING_METADATA_LABELS[field] || `${field.replace(/_/g, ' ')} not recorded`);
 

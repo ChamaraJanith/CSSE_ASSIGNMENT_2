@@ -55,6 +55,21 @@ export const queueItems = [
   }),
 ];
 
+// Larger queue for pagination: IMG-<prefix>-01..NN captured one hour apart, so the highest number is the newest
+export const generateQueueItems = (count, { prefix, reviewStatus = 'UNREVIEWED', idOffset = 100 } = {}) =>
+  Array.from({ length: count }, (_, index) => {
+    const number = String(index + 1).padStart(2, '0');
+    return item({
+      id: idOffset + index + 1,
+      imageCode: `IMG-${prefix}-${number}`,
+      imageUrl: `${STORAGE}/CT-TEST/IMG-${prefix}-${number}.jpg`,
+      reviewStatus,
+      isReviewable: reviewStatus === 'UNREVIEWED' || reviewStatus === 'NEEDS_FURTHER_REVIEW',
+      cameraTrap: yala1,
+      metadata: completeMetadata(new Date(Date.UTC(2026, 8, 1, index)).toISOString(), '6.412850', '81.534180'),
+    });
+  });
+
 const byId = (id) => queueItems.find((entry) => entry.id === id);
 
 export const detail = (id, overrides = {}) => ({ ...byId(id), reviews: [], threatAlerts: [], ...overrides });
