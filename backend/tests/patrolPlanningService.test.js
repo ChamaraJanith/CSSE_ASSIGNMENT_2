@@ -219,29 +219,69 @@ describe('Patrol Planning Service', () => {
   });
 
   describe('getDashboardData', () => {
-    test('should return dashboard telemetry, KPIs and routes', async () => {
-      const mockSingle = jest.fn().mockResolvedValue({ data: { id: 1, name: 'Yala' }, error: null });
-      const mockEqSingle = jest.fn().mockReturnValue({ single: mockSingle });
-      const mockSelectSingle = jest.fn().mockReturnValue({ eq: mockEqSingle });
+    test('should return dashboard telemetry, KPIs and routes with active and stale items', async () => {
+      const mockPark = { id: 1, name: 'Yala', code: 'YALA-NP' };
+      const mockRoutes = [
+        { id: 101, route_name: 'Route Alpha', coverage_gap_percent: 85, recent_incident_count: 2, is_telemetry_stale: true, checkpoints: [{ lat: 6.4, lng: 81.5 }] },
+        { id: 102, route_name: 'Route Beta', coverage_gap_percent: 40, recent_incident_count: 1, is_telemetry_stale: false, checkpoints: [{ lat: 6.5, lng: 81.6 }] }
+      ];
+      const mockRiskZones = [{ id: 1, park_id: 1, severity: 'HIGH' }];
+      const mockRangers = [
+        { id: 10, current_status: 'AVAILABLE', active_assignments_count: 1, max_active_assignments: 5 },
+        { id: 11, current_status: 'ON_SHIFT', active_assignments_count: 3, max_active_assignments: 5 }
+      ];
+      const mockActivePlans = [{ route_id: 102 }];
 
-      const mockEqMultiple = jest.fn().mockResolvedValue({ data: [], error: null });
-      const mockSelectMultiple = jest.fn().mockReturnValue({ eq: mockEqMultiple });
+      const mockParkSingle = jest.fn().mockResolvedValue({ data: mockPark, error: null });
+      const mockParkEq = jest.fn().mockReturnValue({ single: mockParkSingle });
+      const mockParkSelect = jest.fn().mockReturnValue({ eq: mockParkEq });
 
-      const mockPlanIn = jest.fn().mockResolvedValue({ data: [], error: null });
+      const mockRoutesEq = jest.fn().mockResolvedValue({ data: mockRoutes, error: null });
+      const mockRoutesSelect = jest.fn().mockReturnValue({ eq: mockRoutesEq });
+
+      const mockZonesEq = jest.fn().mockResolvedValue({ data: mockRiskZones, error: null });
+      const mockZonesSelect = jest.fn().mockReturnValue({ eq: mockZonesEq });
+
+      const mockRangersEq = jest.fn().mockResolvedValue({ data: mockRangers, error: null });
+      const mockRangersSelect = jest.fn().mockReturnValue({ eq: mockRangersEq });
+
+      const mockPlanIn = jest.fn().mockResolvedValue({ data: mockActivePlans, error: null });
       const mockPlanEq = jest.fn().mockReturnValue({ in: mockPlanIn });
       const mockPlanSelect = jest.fn().mockReturnValue({ eq: mockPlanEq });
 
       supabaseAdmin.from.mockImplementation((table) => {
-        if (table === 'parks') return { select: mockSelectSingle };
-        if (table === 'patrol_routes' || table === 'risk_zones' || table === 'rangers') return { select: mockSelectMultiple };
+        if (table === 'parks') return { select: mockParkSelect };
+        if (table === 'patrol_routes') return { select: mockRoutesSelect };
+        if (table === 'risk_zones') return { select: mockZonesSelect };
+        if (table === 'rangers') return { select: mockRangersSelect };
         if (table === 'patrol_plans') return { select: mockPlanSelect };
       });
 
       const result = await patrolPlanningService.getDashboardData(1);
       expect(result.park.name).toBe('Yala');
-      expect(result.telemetry).toBeDefined();
-      expect(result.kpi).toBeDefined();
-      expect(result.routes).toBeDefined();
+      expect(result.telemetry.isDegraded).toBe(true);
+      expect(result.routes.length).toBe(2);
+      expect(result.topRecommendedRoute.id).toBe(101);
+      expect(result.topRecommendedRoute.isRecommended).toBe(true);
+    });
+
+    test('should fallback to first route when all routes have active patrols', async () => {
+      const mockPark = { id: 1, name: 'Yala' };
+      const mockRoutes = [
+        { id: 101, route_name: 'Route Alpha', coverage_gap_percent: 60, recent_incident_count: 0, is_telemetry_stale: false }
+      ];
+      const mockActivePlans = [{ route_id: 101 }];
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'parks') return { select: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue({ single: jest.fn().mockResolvedValue({ data: mockPark, error: null }) }) }) };
+        if (table === 'patrol_routes') return { select: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ data: mockRoutes, error: null }) }) };
+        if (table === 'risk_zones' || table === 'rangers') return { select: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ data: [], error: null }) }) };
+        if (table === 'patrol_plans') return { select: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue({ in: jest.fn().mockResolvedValue({ data: mockActivePlans, error: null }) }) }) };
+      });
+
+      const result = await patrolPlanningService.getDashboardData(1);
+      expect(result.topRecommendedRoute.id).toBe(101);
+      expect(result.topRecommendedRoute.isRecommended).toBe(true);
     });
   });
 
@@ -307,6 +347,84 @@ describe('Patrol Planning Service', () => {
       const result = await patrolPlanningService.getRangerRecommendations(1, '2026-10-10', '09:00', 4);
       expect(result.rangers[0].hasScheduleConflict).toBe(true);
       expect(result.recommendedRanger.isTopRecommendation).toBe(false);
+    });
+
+    test('[EDGE CASE] should sort rangers by workload and distance when scores match', async () => {
+      const mockRoute = { id: 1, park_id: 1, checkpoints: [{ lat: 6.4, lng: 81.5 }] };
+      const mockRangers = [
+        { id: 10, current_status: 'AVAILABLE', active_assignments_count: 2, max_active_assignments: 5, is_rest_compliant: true, current_lat: 6.45, current_lng: 81.55 },
+        { id: 11, current_status: 'AVAILABLE', active_assignments_count: 0, max_active_assignments: 5, is_rest_compliant: true, current_lat: 6.41, current_lng: 81.51 }
+      ];
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_routes') return { select: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue({ single: jest.fn().mockResolvedValue({ data: mockRoute, error: null }) }) }) };
+        if (table === 'rangers') return { select: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ data: mockRangers, error: null }) }) };
+        if (table === 'patrol_plans') return { select: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue({ in: jest.fn().mockResolvedValue({ data: [], error: null }) }) }) };
+      });
+
+      const result = await patrolPlanningService.getRangerRecommendations(1, '2026-10-10', '08:00', 4);
+      expect(result.recommendedRanger.id).toBe(11);
+    });
+  });
+
+  describe('createPatrolPlan Edge & Error Cases', () => {
+    test('[ERROR CASE] should throw error if ranger override lacks sufficient reason', async () => {
+      const mockPayload = {
+        parkId: 1, routeId: 2, patrolDate: '2026-10-10', startTime: '08:00', priority: 'HIGH',
+        isRangerOverridden: true, rangerOverrideReason: 'bad'
+      };
+      await expect(patrolPlanningService.createPatrolPlan(mockPayload, 1)).rejects.toThrow('A recorded override reason is required when bypassing the recommended ranger');
+    });
+
+    test('[EDGE CASE] should create plan with PENDING_ASSIGNMENT status when no rangerId provided and not a draft', async () => {
+      const mockPayload = {
+        parkId: 1, routeId: 2, patrolDate: '2026-10-10', startTime: '08:00', priority: 'HIGH',
+        rangerId: null, saveAsDraft: false
+      };
+
+      const mockSingle = jest.fn().mockResolvedValue({ data: { id: 200, ...mockPayload, status: 'PENDING_ASSIGNMENT' }, error: null });
+      const mockSelect = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockInsert = jest.fn().mockReturnValue({ select: mockSelect });
+      const mockHistoryInsert = jest.fn().mockResolvedValue({ error: null });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_plans') return { insert: mockInsert };
+        if (table === 'patrol_plan_status_history') return { insert: mockHistoryInsert };
+      });
+
+      const result = await patrolPlanningService.createPatrolPlan(mockPayload, 1);
+      expect(result.status).toBe('PENDING_ASSIGNMENT');
+    });
+  });
+
+  describe('deletePatrolPlan decrement workload test', () => {
+    test('should decrement ranger active assignments when active plan is cancelled', async () => {
+      const mockPlan = { id: 5, status: 'ASSIGNED', ranger_id: 15 };
+      const mockSingle = jest.fn().mockResolvedValue({ data: mockPlan, error: null });
+      const mockEq = jest.fn().mockReturnValue({ single: mockSingle });
+      const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
+
+      const mockRangerSingle = jest.fn().mockResolvedValue({ data: { active_assignments_count: 2 }, error: null });
+      const mockRangerEq = jest.fn().mockReturnValue({ single: mockRangerSingle });
+      const mockRangerSelect = jest.fn().mockReturnValue({ eq: mockRangerEq });
+      const mockRangerUpdateEq = jest.fn().mockResolvedValue({ error: null });
+      const mockRangerUpdate = jest.fn().mockReturnValue({ eq: mockRangerUpdateEq });
+
+      const mockUpdateSingle = jest.fn().mockResolvedValue({ data: { ...mockPlan, status: 'CANCELLED' }, error: null });
+      const mockUpdateSelect = jest.fn().mockReturnValue({ single: mockUpdateSingle });
+      const mockUpdateEq = jest.fn().mockReturnValue({ select: mockUpdateSelect });
+      const mockPlanUpdate = jest.fn().mockReturnValue({ eq: mockUpdateEq });
+
+      const mockHistoryInsert = jest.fn().mockResolvedValue({ error: null });
+
+      supabaseAdmin.from.mockImplementation((table) => {
+        if (table === 'patrol_plans') return { select: mockSelect, update: mockPlanUpdate };
+        if (table === 'rangers') return { select: mockRangerSelect, update: mockRangerUpdate };
+        if (table === 'patrol_plan_status_history') return { insert: mockHistoryInsert };
+      });
+
+      const result = await patrolPlanningService.deletePatrolPlan(5);
+      expect(result.type).toBe('CANCELLED');
     });
   });
 });
