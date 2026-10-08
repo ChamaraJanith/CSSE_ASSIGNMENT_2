@@ -25,6 +25,8 @@ export const IMAGE_STATUS = Object.freeze({ LOADING: 'loading', LOADED: 'loaded'
 export const ALL_STATUSES = 'ALL';
 // UI limit for optional review notes (wireframe "0 / 500" counter)
 export const NOTES_MAX_LENGTH = 500;
+// UI limit for the escalation reason (wireframe "0 / 500" counter); the backend does not enforce it
+export const ESCALATION_REASON_MAX_LENGTH = 500;
 export const NOT_RECORDED = 'Not recorded';
 
 const STATUS_LABELS = {
