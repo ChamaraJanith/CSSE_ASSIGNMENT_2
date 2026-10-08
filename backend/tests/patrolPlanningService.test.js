@@ -227,9 +227,14 @@ describe('Patrol Planning Service', () => {
       const mockEqMultiple = jest.fn().mockResolvedValue({ data: [], error: null });
       const mockSelectMultiple = jest.fn().mockReturnValue({ eq: mockEqMultiple });
 
+      const mockPlanIn = jest.fn().mockResolvedValue({ data: [], error: null });
+      const mockPlanEq = jest.fn().mockReturnValue({ in: mockPlanIn });
+      const mockPlanSelect = jest.fn().mockReturnValue({ eq: mockPlanEq });
+
       supabaseAdmin.from.mockImplementation((table) => {
         if (table === 'parks') return { select: mockSelectSingle };
         if (table === 'patrol_routes' || table === 'risk_zones' || table === 'rangers') return { select: mockSelectMultiple };
+        if (table === 'patrol_plans') return { select: mockPlanSelect };
       });
 
       const result = await patrolPlanningService.getDashboardData(1);
