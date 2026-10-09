@@ -1,10 +1,9 @@
 import React, { useRef } from 'react';
-import RiskZoneMap from './RiskZoneMap';
 import RuleActionsMenu from './RuleActionsMenu';
 import RuleModal from './RuleModal';
 import RuleStatusBadge from './RuleStatusBadge';
-import { RuleSummary } from './RuleReviewView';
-import { findZone, formatDateTime } from './monitoringRuleUtils';
+import { RuleSummary, RuleZoneMapCard } from './RuleReviewView';
+import { formatDateTime } from './monitoringRuleUtils';
 
 // Status and timestamps of a saved rule. Activated only exists while a rule is ACTIVE.
 export function RuleRecordMeta({ rule }) {
@@ -30,7 +29,6 @@ export default function RuleDetailsView({
   rule, parkName, riskZones, options, actionsDisabled = false, onAction, onClose,
 }) {
   const closeRef = useRef(null);
-  const zone = findZone(riskZones, rule.riskZoneId);
 
   return (
     <RuleModal
@@ -59,18 +57,7 @@ export default function RuleDetailsView({
         <RuleSummary rule={rule} parkName={parkName} riskZones={riskZones} options={options} hideEmptyNotes showSeverity />
       </section>
 
-      <section className="mr-review-card" aria-labelledby="mr-details-map-title">
-        <div className="mr-review-card-header">
-          <h3 id="mr-details-map-title" className="mr-section-title">Risk Zone Map</h3>
-        </div>
-        {zone ? (
-          <RiskZoneMap selectedZone={zone} riskZones={riskZones} parkName={parkName} />
-        ) : (
-          <p className="mr-muted" role="status">
-            The location of this risk zone is not available for {parkName}, so it cannot be shown on the map.
-          </p>
-        )}
-      </section>
+      <RuleZoneMapCard titleId="mr-details-map-title" rule={rule} parkName={parkName} riskZones={riskZones} />
 
       <section className="mr-review-card" aria-labelledby="mr-details-record-title">
         <div className="mr-review-card-header">

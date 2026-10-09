@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft, CheckCircle2, Pencil, Save } from 'lucide-react';
+import RiskZoneMap from './RiskZoneMap';
 import RuleStepper from './RuleStepper';
 import {
   NOT_RECORDED, REVIEW_STEP, RULE_ACTIONS, TOTAL_STEPS, findZone, formatRecipients, formatZone, getOptionLabel,
@@ -41,6 +42,29 @@ export function RuleSummary({ rule, parkName, riskZones, options, hideEmptyNotes
 }
 
 /**
+ * "Risk Zone Map" card of the review screen and the details dialog. The zone's geometry comes
+ * from the selected park's reference zones, so the map only ever shows that park's stored data.
+ */
+export function RuleZoneMapCard({ titleId, rule, parkName, riskZones }) {
+  const zone = findZone(riskZones, rule.riskZoneId);
+
+  return (
+    <section className="mr-review-card" aria-labelledby={titleId}>
+      <div className="mr-review-card-header">
+        <h3 id={titleId} className="mr-section-title">Risk Zone Map</h3>
+      </div>
+      {zone ? (
+        <RiskZoneMap selectedZone={zone} riskZones={riskZones} parkName={parkName} />
+      ) : (
+        <p className="mr-muted" role="status">
+          The location of this risk zone is not available for {parkName}, so it cannot be shown on the map.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
  * Step 3 of 3. Nothing is saved until the Park Manager chooses Activate Rule or Save as Draft.
  * Edit, Back and the stepper return to the configuration with every value kept; reaching this
  * screen again always requires a new Submit for Validation.
@@ -74,21 +98,25 @@ export default function RuleReviewView({
         <CheckCircle2 size={18} /> The configuration passed validation.
       </div>
 
-      <section className="mr-review-card" aria-labelledby="mr-review-details-title">
-        <div className="mr-review-card-header">
-          <h3 id="mr-review-details-title" className="mr-section-title">Rule Details</h3>
-          <button
-            type="button"
-            className="btn-tactical btn-tactical-secondary mr-edit-button"
-            onClick={() => onEdit(1)}
-            disabled={submitting}
-          >
-            <Pencil size={15} /> Edit
-          </button>
-        </div>
-        <RuleSummary rule={rule} parkName={parkName} riskZones={riskZones} options={options} hideEmptyNotes />
-        <p className="mr-muted">Any change returns you to the configuration, and the rule is validated again before review.</p>
-      </section>
+      <div className="mr-review-grid">
+        <section className="mr-review-card" aria-labelledby="mr-review-details-title">
+          <div className="mr-review-card-header">
+            <h3 id="mr-review-details-title" className="mr-section-title">Rule Details</h3>
+            <button
+              type="button"
+              className="btn-tactical btn-tactical-secondary mr-edit-button"
+              onClick={() => onEdit(1)}
+              disabled={submitting}
+            >
+              <Pencil size={15} /> Edit
+            </button>
+          </div>
+          <RuleSummary rule={rule} parkName={parkName} riskZones={riskZones} options={options} hideEmptyNotes />
+          <p className="mr-muted">Any change returns you to the configuration, and the rule is validated again before review.</p>
+        </section>
+
+        <RuleZoneMapCard titleId="mr-review-map-title" rule={rule} parkName={parkName} riskZones={riskZones} />
+      </div>
 
       {error && <p className="mr-inline-error" role="alert">{error}</p>}
 

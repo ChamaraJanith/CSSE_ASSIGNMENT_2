@@ -716,6 +716,14 @@
   color: var(--cmd-text-body);
 }
 
+/* Rule Details on the left, Risk Zone Map on the right; stacked below 900px */
+.mr-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
 .mr-review-card {
   display: flex;
   flex-direction: column;
@@ -862,7 +870,8 @@
 }
 
 @media (max-width: 900px) {
-  .mr-step1-grid {
+  .mr-step1-grid,
+  .mr-review-grid {
     grid-template-columns: 1fr;
   }
 
