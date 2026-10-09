@@ -1,72 +1,198 @@
 /* ==============================================================================
    WildGuard - UC02 Camera-Trap Evidence Review
-   Builds on the palette and panel/table/button classes in PatrolPlanning.css
+   Light theme from the UC02 high-fidelity wireframes. Every rule is scoped to
+   .er-container, so the dark dashboard shell and other use cases are unaffected.
+   The shared panel/table/button classes from PatrolPlanning.css are restyled
+   here only inside the UC02 screens.
    ============================================================================== */
 
 .er-container {
+  --er-primary: #1f4d36;
+  --er-primary-hover: #173a29;
+  --er-heading: #14281d;
+  --er-text: #1f2937;
+  --er-text-muted: #6b7280;
+  --er-surface: #f4f6f4;
+  --er-card: #ffffff;
+  --er-subtle: #f9fafb;
+  --er-border: #e3e7e4;
+  --er-border-strong: #cfd6d1;
+  --er-shadow: 0 1px 3px rgba(16, 40, 28, 0.08);
+  --er-success: #1e7a3c;
+  --er-success-bg: #edf7ef;
+  --er-success-border: #b9dfc2;
+  --er-warning: #c2410c;
+  --er-warning-bg: #fff4e8;
+  --er-warning-border: #fbc79b;
+  --er-danger: #d32f2f;
+  --er-danger-hover: #b71c1c;
+  --er-danger-bg: #fdeeee;
+  --er-danger-border: #f2b8b8;
+  --er-info: #0e7490;
+  --er-info-bg: #ecfafd;
+  --er-info-border: #a5e3ef;
+
   position: relative;
   z-index: 10;
-  color: var(--cmd-text-body);
+  color: var(--er-text);
 }
 
-.er-panel {
+/* --- Page surface: replaces the dark translucent panel inside UC02 only --- */
+.er-container .er-panel {
+  background: var(--er-surface);
+  border: 1px solid var(--er-border);
+  border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  backdrop-filter: none;
+  color: var(--er-text);
   animation: consoleFadeIn 0.25s ease-out;
+}
+
+/* The queue wireframe is a single white card */
+.er-container .er-queue {
+  background: var(--er-card);
+}
+
+.er-container .panel-header {
+  flex-wrap: wrap;
+  gap: 12px;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.er-container .panel-title {
+  color: var(--er-heading);
+}
+
+.er-page-title {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .er-section-title {
   margin: 0 0 10px;
-  font-size: 0.95rem;
-  color: var(--cmd-text-heading);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--er-heading);
 }
 
 .er-muted {
   margin: 0;
-  font-size: 0.75rem;
-  color: var(--cmd-text-muted);
+  font-size: 0.8rem;
+  color: var(--er-text-muted);
 }
 
 .er-code {
-  font-family: monospace;
-  font-weight: 700;
-  color: var(--cmd-emerald-bright);
+  font-weight: 600;
+  color: var(--er-text);
 }
 
-/* --- Review queue: tabs + search/filter share one control row (UC02 hi-fi wireframe) --- */
+/* --- Buttons: solid dark green primary, white outlined secondary, solid red danger --- */
+.er-container .btn-tactical {
+  border-radius: 8px;
+  font-weight: 600;
+  transform: none;
+}
+
+.er-container .btn-tactical-primary {
+  background: var(--er-primary);
+  border: 1px solid var(--er-primary);
+  color: #fff;
+  box-shadow: none;
+}
+
+.er-container .btn-tactical-primary:hover:not(:disabled) {
+  background: var(--er-primary-hover);
+  border-color: var(--er-primary-hover);
+  box-shadow: none;
+  transform: none;
+}
+
+.er-container .btn-tactical-secondary {
+  background: var(--er-card);
+  border: 1px solid var(--er-border-strong);
+  color: var(--er-heading);
+}
+
+.er-container .btn-tactical-secondary:hover:not(:disabled) {
+  background: var(--er-subtle);
+  border-color: var(--er-primary);
+}
+
+.er-container .btn-tactical-danger {
+  background: var(--er-danger);
+  border: 1px solid var(--er-danger);
+  color: #fff;
+}
+
+.er-container .btn-tactical-danger:hover:not(:disabled) {
+  background: var(--er-danger-hover);
+  border-color: var(--er-danger-hover);
+}
+
+.er-container .btn-tactical:disabled {
+  opacity: 0.55;
+}
+
+.er-container .btn-tactical:focus-visible,
+.er-container .er-tab:focus-visible,
+.er-container .er-page-btn:focus-visible,
+.er-container .er-class-card:focus-within {
+  outline: 2px solid var(--er-primary);
+  outline-offset: 2px;
+}
+
+/* --- Review queue: tabs + search/filter share one control row --- */
 .er-queue-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .er-tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
 .er-tab {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--cmd-text-muted);
-  padding: 10px 14px;
-  font-weight: 600;
+  color: var(--er-text);
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
   cursor: pointer;
 }
 
+.er-tab:hover {
+  color: var(--er-primary);
+}
+
 .er-tab.active {
-  color: var(--cmd-text-heading);
-  border-bottom-color: var(--cmd-emerald);
+  color: var(--er-heading);
+  font-weight: 700;
+  border-bottom-color: var(--er-primary);
 }
 
 .er-tab-count {
   margin-left: 6px;
-  padding: 1px 8px;
+  padding: 1px 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 0.75rem;
+  background: #eef1ef;
+  color: var(--er-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.er-tab.active .er-tab-count {
+  background: var(--er-success-bg);
+  color: var(--er-primary);
 }
 
 .er-toolbar {
@@ -76,28 +202,39 @@
   justify-content: flex-end;
   gap: 12px;
   align-items: center;
-  padding-bottom: 10px;
+  padding-bottom: 6px;
 }
 
 .er-search {
-  flex: 0 1 280px;
+  flex: 0 1 260px;
   min-width: 200px;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-radius: 9px;
-  border: 1px solid var(--cmd-border);
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--cmd-text-muted);
+  border-radius: 8px;
+  border: 1px solid var(--er-border-strong);
+  background: var(--er-card);
+  color: var(--er-text);
+}
+
+.er-search:focus-within {
+  border-color: var(--er-primary);
 }
 
 .er-search input {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   outline: none;
-  color: var(--cmd-text-heading);
+  color: var(--er-text);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.er-search input::placeholder {
+  color: var(--er-text-muted);
 }
 
 .er-select-label {
@@ -105,40 +242,84 @@
   align-items: center;
   gap: 8px;
   font-size: 0.85rem;
+  color: var(--er-text-muted);
 }
 
 .er-select-label select,
 .er-field textarea {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--cmd-border);
-  border-radius: 9px;
-  color: var(--cmd-text-heading);
+  background: var(--er-card);
+  border: 1px solid var(--er-border-strong);
+  border-radius: 8px;
+  color: var(--er-text);
   padding: 8px 10px;
   font: inherit;
+  font-size: 0.85rem;
 }
 
+.er-select-label select:focus,
+.er-field textarea:focus {
+  outline: none;
+  border-color: var(--er-primary);
+  box-shadow: 0 0 0 3px rgba(31, 77, 54, 0.12);
+}
+
+/* --- Review queue table: white bordered card with light header row --- */
 .er-table-wrapper {
   overflow-x: auto;
+  border: 1px solid var(--er-border);
+  border-radius: 10px;
+  background: var(--er-card);
 }
 
-.er-queue .tactical-table td {
+.er-container .tactical-table {
+  font-size: 0.85rem;
+  color: var(--er-text);
+}
+
+.er-container .tactical-table th {
+  padding: 12px 14px;
+  background: var(--er-subtle);
+  color: var(--er-heading);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  border-bottom: 1px solid var(--er-border);
+  white-space: nowrap;
+}
+
+.er-container .tactical-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--er-border);
   vertical-align: middle;
 }
 
-/* Larger thumbnails and uppercase status badges, as in the queue wireframe */
+.er-container .tactical-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.er-container .tactical-row {
+  cursor: default;
+}
+
+.er-container .tactical-row:hover {
+  background: #f6faf7;
+}
+
+/* Evidence ID and Camera ID stay on one line */
+.er-queue .tactical-table td:nth-child(2),
+.er-queue .tactical-table td:nth-child(3) {
+  white-space: nowrap;
+}
+
 .er-queue .er-thumbnail {
-  width: 88px;
-  height: 60px;
+  width: 96px;
+  height: 64px;
 }
 
-.er-queue .er-status-badge {
-  text-transform: uppercase;
-}
-
-.er-queue .er-status-unreviewed {
-  background: rgba(249, 115, 22, 0.14);
-  color: #fdba74;
-  border-color: rgba(249, 115, 22, 0.5);
+.er-queue .btn-tactical {
+  padding: 7px 16px;
+  font-size: 0.8rem;
 }
 
 /* --- Review queue footer: results count + pagination --- */
@@ -153,7 +334,7 @@
 .er-results-count {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--cmd-text-muted);
+  color: var(--er-text);
 }
 
 .er-pagination {
@@ -170,34 +351,35 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--cmd-text-heading);
+  border-radius: 7px;
+  border: 1px solid var(--er-border-strong);
+  background: var(--er-card);
+  color: var(--er-text);
   font: inherit;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .er-page-btn:hover:not(:disabled) {
-  border-color: var(--cmd-border-hover);
+  border-color: var(--er-primary);
 }
 
 .er-page-btn.active {
-  background: var(--cmd-emerald);
-  border-color: var(--cmd-emerald);
+  background: var(--er-primary);
+  border-color: var(--er-primary);
   color: #fff;
+  font-weight: 700;
 }
 
 .er-page-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .er-page-gap {
   padding: 0 4px;
-  color: var(--cmd-text-muted);
+  color: var(--er-text-muted);
 }
 
 @media (max-width: 640px) {
@@ -208,6 +390,10 @@
   .er-search {
     flex: 1 1 100%;
   }
+
+  .er-queue-footer {
+    justify-content: center;
+  }
 }
 
 /* --- Images --- */
@@ -216,11 +402,11 @@
   height: 48px;
   border-radius: 6px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.35);
+  background: #e8ece9;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--cmd-text-muted);
+  color: var(--er-text-muted);
 }
 
 .er-thumbnail img {
@@ -232,10 +418,10 @@
 .er-image-frame {
   position: relative;
   min-height: 280px;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid var(--cmd-border);
-  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--er-border);
+  background: #e8ece9;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -244,7 +430,7 @@
 .er-image {
   width: 100%;
   max-height: 460px;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .er-image-pending {
@@ -256,7 +442,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--cmd-text-muted);
+  color: var(--er-text-muted);
 }
 
 .er-image-error {
@@ -264,95 +450,160 @@
   gap: 10px;
   padding: 24px;
   text-align: center;
-  color: #fca5a5;
-  border-color: rgba(239, 68, 68, 0.4);
+  color: var(--er-danger);
+  background: var(--er-danger-bg);
+  border-color: var(--er-danger-border);
 }
 
 .er-image-error p {
   margin: 0;
   max-width: 380px;
-  color: var(--cmd-text-body);
+  color: var(--er-text);
   font-size: 0.85rem;
 }
 
-/* --- Status badges --- */
+/* --- Status badges: uppercase pills, color + text --- */
 .er-status-badge {
   display: inline-block;
   padding: 3px 9px;
-  border-radius: 6px;
-  font-size: 0.72rem;
+  border-radius: 5px;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   white-space: nowrap;
   border: 1px solid transparent;
 }
 
 .er-status-unreviewed {
-  background: rgba(148, 163, 184, 0.15);
-  color: #cbd5e1;
-  border-color: rgba(148, 163, 184, 0.4);
+  background: var(--er-warning-bg);
+  color: var(--er-warning);
+  border-color: var(--er-warning-border);
 }
 
 .er-status-reviewed {
-  background: rgba(16, 185, 129, 0.14);
-  color: #6ee7b7;
-  border-color: rgba(16, 185, 129, 0.45);
+  background: var(--er-success-bg);
+  color: var(--er-success);
+  border-color: var(--er-success-border);
 }
 
 .er-status-needs-further-review {
-  background: rgba(245, 158, 11, 0.16);
-  color: #fde68a;
-  border-color: rgba(245, 158, 11, 0.5);
+  background: #fff8e6;
+  color: #b45309;
+  border-color: #f7d48a;
 }
 
 .er-status-reviewed-escalated {
-  background: rgba(239, 68, 68, 0.16);
-  color: #fca5a5;
-  border-color: rgba(239, 68, 68, 0.5);
+  background: var(--er-danger-bg);
+  color: var(--er-danger);
+  border-color: var(--er-danger-border);
 }
 
-/* --- Detail / classification --- */
-.er-detail-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 22px;
-}
-
-@media (max-width: 1000px) {
-  .er-detail-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.er-detail-side {
+/* --- Cards: white with subtle border and soft shadow --- */
+.er-evidence-card {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 18px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--er-border);
+  background: var(--er-card);
+  box-shadow: var(--er-shadow);
+}
+
+.er-evidence-card .er-section-title {
+  margin: 0;
+}
+
+/* --- Classify Evidence: Evidence Summary card --- */
+.er-evidence-card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.er-evidence-info {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.er-classify .er-image-frame {
+  min-height: 200px;
+}
+
+.er-classify .er-image {
+  height: 220px;
+  max-height: 320px;
+}
+
+.er-capture-metadata {
+  border-top: 1px solid var(--er-border);
+  padding-top: 12px;
+}
+
+.er-capture-metadata h4 {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--er-text-muted);
+}
+
+.er-capture-metadata dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px 16px;
+}
+
+.er-capture-metadata dt {
+  font-size: 0.72rem;
+  color: var(--er-text-muted);
+}
+
+.er-capture-metadata dd {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--er-text);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .er-evidence-card-body {
+    grid-template-columns: 1fr;
+  }
 }
 
 .er-summary {
   margin: 0;
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .er-summary-row {
   display: grid;
-  grid-template-columns: 150px 1fr;
+  grid-template-columns: 140px 1fr;
   gap: 10px;
-  font-size: 0.85rem;
+  align-items: center;
+  font-size: 0.87rem;
 }
 
 .er-summary-row dt {
-  color: var(--cmd-text-muted);
+  color: var(--er-text);
 }
 
 .er-summary-row dd {
   margin: 0;
-  color: var(--cmd-text-heading);
+  color: var(--er-text);
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 
+/* --- Metadata warning (amber) and notices (cyan) --- */
 .er-warning,
 .er-notice {
   display: flex;
@@ -364,9 +615,14 @@
 }
 
 .er-warning {
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  color: #fde68a;
+  background: var(--er-warning-bg);
+  border: 1px solid var(--er-warning-border);
+  border-left: 4px solid #f59e0b;
+  color: #7c2d12;
+}
+
+.er-warning strong {
+  color: var(--er-warning);
 }
 
 .er-warning ul {
@@ -377,12 +633,13 @@
 .er-warning-icon {
   flex-shrink: 0;
   margin-top: 2px;
+  color: #f59e0b;
 }
 
 .er-notice {
-  background: rgba(6, 182, 212, 0.1);
-  border: 1px solid rgba(6, 182, 212, 0.4);
-  color: #a5f3fc;
+  background: var(--er-info-bg);
+  border: 1px solid var(--er-info-border);
+  color: var(--er-info);
 }
 
 .er-metadata-flag {
@@ -391,12 +648,14 @@
   gap: 4px;
   margin-top: 4px;
   font-size: 0.72rem;
-  color: #fde68a;
+  font-weight: 600;
+  color: var(--er-warning);
+  white-space: nowrap;
 }
 
 .er-history {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 10px;
+  border-top: 1px solid var(--er-border);
+  padding-top: 12px;
 }
 
 .er-history h4 {
@@ -405,14 +664,15 @@
   gap: 6px;
   margin: 0 0 8px;
   font-size: 0.85rem;
-  color: var(--cmd-text-heading);
+  color: var(--er-heading);
 }
 
 .er-history-item {
   font-size: 0.8rem;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--er-border);
+  background: var(--er-subtle);
   margin-bottom: 6px;
 }
 
@@ -420,59 +680,135 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #fca5a5;
+  color: var(--er-danger);
 }
 
+/* --- Classify Evidence: Classification + Notes + actions share one white card --- */
 .er-classify-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 18px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--er-border);
+  background: var(--er-card);
+  box-shadow: var(--er-shadow);
 }
 
 .er-classification {
   border: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .er-classification legend {
-  margin-bottom: 8px;
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 1rem;
   font-weight: 700;
-  color: var(--cmd-text-heading);
+  color: var(--er-heading);
 }
 
-.er-option {
+/* --- Classification cards: radio top-left, icon, title, description --- */
+.er-class-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.er-class-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 16px 18px;
   border-radius: 10px;
-  border: 1px solid var(--cmd-border);
-  background: var(--cmd-bg-card);
+  border: 1px solid var(--er-border);
+  background: var(--er-card);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.er-class-card:hover {
+  border-color: var(--er-border-strong);
+  box-shadow: var(--er-shadow);
+}
+
+.er-class-card.selected {
+  border: 1px solid var(--er-primary);
+  background: #f7fbf8;
+  box-shadow: 0 0 0 1px var(--er-primary);
+}
+
+.er-class-card input {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--er-primary);
   cursor: pointer;
 }
 
-.er-option.selected {
-  border-color: var(--cmd-emerald);
-  box-shadow: 0 0 0 1px var(--cmd-emerald-glow);
+.er-class-card-icon {
+  color: var(--er-heading);
 }
 
-.er-option input {
-  align-self: flex-start;
-  accent-color: var(--cmd-emerald);
-}
-
-.er-option-label {
+.er-class-card-title {
   font-weight: 700;
-  color: var(--cmd-text-heading);
+  color: var(--er-heading);
 }
 
-.er-option-hint {
+.er-class-card.selected .er-class-card-title,
+.er-class-card.selected .er-class-card-icon {
+  color: var(--er-primary);
+}
+
+.er-class-card-description {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--er-text);
+}
+
+.er-class-card-outcome {
+  font-size: 0.72rem;
+  color: var(--er-text-muted);
+}
+
+.er-classification:disabled .er-class-card {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* --- Notes with character counter --- */
+.er-notes-field textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.er-notes-optional {
+  font-weight: 400;
+  color: var(--er-text-muted);
+}
+
+.er-char-counter {
+  align-self: flex-end;
   font-size: 0.75rem;
-  color: var(--cmd-text-muted);
+  font-weight: 400;
+  color: var(--er-text-muted);
+}
+
+.er-classify-actions .btn-tactical {
+  min-width: 160px;
 }
 
 .er-field {
@@ -481,7 +817,7 @@
   gap: 6px;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--cmd-text-heading);
+  color: var(--er-heading);
 }
 
 .er-checkbox {
@@ -489,26 +825,39 @@
   align-items: center;
   gap: 8px;
   font-size: 0.85rem;
-  color: var(--cmd-text-heading);
+  color: var(--er-text);
+}
+
+.er-checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--er-primary);
 }
 
 .er-inline-error {
   margin: 0;
-  color: #fca5a5;
+  color: var(--er-danger);
   font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .er-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
 }
 
 .er-actions-end {
   justify-content: flex-end;
 }
 
-/* --- States --- */
+@media (max-width: 420px) {
+  .er-classify-actions .btn-tactical {
+    flex: 1 1 100%;
+  }
+}
+
+/* --- Loading / empty / error states --- */
 .er-state {
   display: flex;
   flex-direction: column;
@@ -516,7 +865,7 @@
   gap: 10px;
   padding: 36px;
   text-align: center;
-  color: var(--cmd-text-muted);
+  color: var(--er-text-muted);
 }
 
 .er-state p {
@@ -524,7 +873,7 @@
 }
 
 .er-state-error {
-  color: #fca5a5;
+  color: var(--er-danger);
 }
 
 .er-spin {
@@ -537,49 +886,358 @@
   }
 }
 
-/* --- Escalation modal --- */
-.er-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.75);
+/* --- Escalate Suspicious Evidence --- */
+.er-danger-banner {
   display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--er-danger-border);
+  background: var(--er-danger-bg);
+  color: var(--er-danger);
+  font-size: 0.88rem;
+}
+
+.er-danger-banner strong {
+  display: block;
+  color: var(--er-danger);
+}
+
+.er-danger-banner p {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: #9b2c2c;
+}
+
+.er-danger-banner-icon {
+  flex-shrink: 0;
+  color: var(--er-danger);
+}
+
+.er-escalate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Evidence Summary (wider) | Threat Priority + Recipient / Team */
+.er-escalate-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* Image on the left, summary rows on the right */
+.er-escalate-summary-body {
+  display: grid;
+  grid-template-columns: minmax(120px, 2fr) minmax(0, 3fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.er-escalate .er-image-frame {
+  min-height: 160px;
+}
+
+.er-escalate .er-image {
+  height: 180px;
+  max-height: 240px;
+}
+
+.er-escalate .er-summary-row {
+  grid-template-columns: 100px 1fr;
+}
+
+/* Threat priority and recipient each read as their own card, as in the wireframe */
+.er-escalate-details {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.er-escalate-details > .er-section-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.er-escalate-details .er-fixed-field {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--er-border);
+  background: var(--er-card);
+  box-shadow: var(--er-shadow);
+}
+
+/* Suspicious Person: red text, as in the wireframe */
+.er-classification-tag {
+  display: inline;
+  color: var(--er-danger);
+  font-weight: 700;
+}
+
+.er-classification-tag-neutral {
+  color: var(--er-text);
+}
+
+.er-required {
+  margin-left: 2px;
+  color: var(--er-danger);
+}
+
+.er-fixed-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.er-fixed-input input {
+  width: 100%;
+  padding: 10px 34px 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--er-border-strong);
+  background: var(--er-card);
+  color: var(--er-text);
+  font: inherit;
+  font-weight: 500;
+  cursor: default;
+}
+
+.er-fixed-input-with-icon input {
+  padding-left: 36px;
+}
+
+.er-fixed-input input:focus {
+  outline: none;
+  border-color: var(--er-primary);
+}
+
+.er-fixed-leading-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--er-danger);
+  pointer-events: none;
+}
+
+.er-fixed-icon {
+  position: absolute;
+  right: 12px;
+  color: var(--er-text-muted);
+  pointer-events: none;
+}
+
+.er-escalate .er-notes-field {
+  padding: 16px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--er-border);
+  background: var(--er-card);
+  box-shadow: var(--er-shadow);
+}
+
+.er-escalate-actions {
+  justify-content: flex-end;
+}
+
+.er-escalate-actions .btn-tactical {
+  min-width: 160px;
+}
+
+.er-escalate-actions .btn-tactical-danger {
+  min-width: 220px;
+}
+
+@media (max-width: 900px) {
+  .er-escalate-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .er-escalate-summary-body {
+    grid-template-columns: 1fr;
+  }
+
+  .er-escalate-actions .btn-tactical,
+  .er-escalate-actions .btn-tactical-danger {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+
+/* --- Review Result: horizontal success banner with filled check --- */
+.er-result-banner {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 24px;
+  row-gap: 8px;
+  align-items: center;
+  justify-items: start;
+  padding: 22px 28px;
+  border-radius: 10px;
+  border: 1px solid var(--er-success-border);
+  background: var(--er-success-bg);
+}
+
+.er-result-icon {
+  grid-row: 1 / span 4;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--er-success);
+  color: #fff;
 }
 
-.er-modal {
-  width: 100%;
-  max-width: 560px;
-  max-height: 90vh;
-  overflow-y: auto;
-  background: #06140f;
-}
-
-/* --- Result --- */
-.er-result-header {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  color: var(--cmd-emerald-bright);
-}
-
-.er-result-header h2 {
+.er-result-banner h2 {
   margin: 0;
-  color: var(--cmd-text-heading);
+  font-size: 1.35rem;
+  color: var(--er-heading);
 }
 
-.er-result-header p {
-  margin: 4px 0 0;
-  color: var(--cmd-text-body);
+.er-result-banner p {
+  margin: 0;
+  color: var(--er-text);
+  font-size: 0.88rem;
+}
+
+.er-result-banner .er-result-outcome {
+  font-size: 0.8rem;
+  color: var(--er-text-muted);
+}
+
+/* Evidence details | Review outcome */
+.er-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 32px;
+}
+
+.er-result-column .er-summary-row,
+.er-result-extra .er-summary-row {
+  grid-template-columns: 130px 1fr;
+}
+
+.er-result-extra {
+  border-top: 1px solid var(--er-border);
+  padding-top: 12px;
+}
+
+.er-result .er-code {
+  color: var(--er-danger);
+  font-weight: 700;
+}
+
+.er-linked-image,
+.er-info-banner-link {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.er-linked-image {
+  color: var(--er-success);
+  font-weight: 700;
+}
+
+.er-muted-inline {
+  color: var(--er-text-muted);
+  font-weight: 400;
+}
+
+/* Threat alert information: light green, as in the wireframe */
+.er-info-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--er-success-border);
+  background: var(--er-success-bg);
+  color: var(--er-text);
+  font-size: 0.85rem;
+}
+
+.er-info-banner p {
+  margin: 0;
+}
+
+.er-info-banner .er-info-banner-link {
+  margin-top: 6px;
+  font-weight: 700;
+  color: var(--er-danger);
+}
+
+.er-info-banner-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--er-success);
+}
+
+.er-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Back to Review Queue on the left, View Alert on the right */
+.er-result-actions {
+  justify-content: space-between;
+  padding-top: 4px;
+}
+
+.er-result-actions .btn-tactical {
+  min-width: 200px;
+  padding: 12px 20px;
+}
+
+@media (max-width: 760px) {
+  .er-result-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .er-result-banner {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    padding: 20px 16px;
+  }
+
+  .er-result-icon {
+    grid-row: auto;
+  }
+
+  .er-result-actions .btn-tactical {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .er-result-column .er-summary-row {
+    grid-template-columns: 110px 1fr;
+  }
 }
 
 .er-alert-details {
-  border: 1px solid rgba(239, 68, 68, 0.45);
-  background: rgba(239, 68, 68, 0.08);
-  border-radius: 10px;
-  padding: 14px;
+  border: 1px solid var(--er-danger-border);
+  background: var(--er-card);
+  border-left: 4px solid var(--er-danger);
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: var(--er-shadow);
 }
 
 .er-alert-details-header {
@@ -587,11 +1245,26 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
-  color: #fca5a5;
+  color: var(--er-danger);
 }
 
 .er-alert-details-header strong {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+@media (max-width: 480px) {
+  .er-container .er-panel {
+    padding: 16px;
+  }
+
+  .er-summary-row {
+    grid-template-columns: 110px 1fr;
+  }
+
+  .er-evidence-card,
+  .er-classify-form {
+    padding: 16px;
+  }
 }

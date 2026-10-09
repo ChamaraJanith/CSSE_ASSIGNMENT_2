@@ -35,15 +35,23 @@ const openEvidence = async (user, imageCode, evidence, { loadImage = true } = {}
   return image;
 };
 
+const resultBanner = () => screen.getByRole('status', { name: 'Review result' });
+const outcomeColumn = () => screen.getByLabelText('Review outcome');
+
 const confirmReviewButton = () => screen.getByRole('button', { name: /Confirm Review/ });
 const confirmEscalationButton = () => screen.getByRole('button', { name: /Confirm Escalation/ });
 
-const startSuspiciousEscalation = async (user, imageCode, evidence) => {
+const escalationReasonBox = () => screen.getByRole('textbox', { name: /Escalation Reason/ });
+
+// Classifies as Suspicious Person, waits for the Escalate screen and (unless told otherwise) lets its image load
+const startSuspiciousEscalation = async (user, imageCode, evidence, { loadImage = true } = {}) => {
   await openEvidence(user, imageCode, evidence);
   apiService.submitEvidenceReview.mockResolvedValueOnce({ data: confirmationRequiredResult(evidence.id) });
   await user.click(screen.getByRole('radio', { name: /Suspicious Person/ }));
   await user.click(confirmReviewButton());
-  return screen.findByRole('dialog');
+  const title = await screen.findByRole('heading', { name: /Escalate Suspicious Evidence/ });
+  if (loadImage) fireEvent.load(screen.getByAltText(`Camera-trap evidence ${imageCode}`));
+  return title.closest('.er-escalate');
 };
 
 beforeEach(() => {
@@ -116,8 +124,10 @@ describe('EvidenceReviewManager - classification flow', () => {
 
     expect(apiService.submitEvidenceReview).toHaveBeenCalledWith(3, { classification: 'WILDLIFE_SPECIES', notes: 'Leopard resting on rock' });
     expect(await screen.findByText('Review Completed')).toBeInTheDocument();
-    expect(screen.getByText('Reviewed')).toBeInTheDocument();
+    expect(within(resultBanner()).getByText('Reviewed')).toBeInTheDocument();
+    expect(within(outcomeColumn()).getByText('Reviewed')).toBeInTheDocument();
     expect(screen.getByText(/No threat alert was created/)).toBeInTheDocument();
+    expect(screen.queryByText('Threat Alert ID')).not.toBeInTheDocument();
     expect(screen.getByText('Leopard resting on rock')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /View Alert/ })).not.toBeInTheDocument();
   });
@@ -133,7 +143,10 @@ describe('EvidenceReviewManager - classification flow', () => {
     await user.click(confirmReviewButton());
 
     expect(apiService.submitEvidenceReview).toHaveBeenCalledWith(3, { classification: 'UNKNOWN', notes: '' });
-    expect(await screen.findByText('Needs Further Review')).toBeInTheDocument();
+    expect(await screen.findByText('Review Completed')).toBeInTheDocument();
+    expect(within(resultBanner()).getByText('Needs Further Review')).toBeInTheDocument();
+    expect(within(outcomeColumn()).getByText('Needs Further Review')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /View Alert/ })).not.toBeInTheDocument();
     expect(screen.getByText(/remains in the review queue for secondary review/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Back to Review Queue/ }));
@@ -193,51 +206,100 @@ describe('EvidenceReviewManager - image loading failure', () => {
 });
 
 describe('EvidenceReviewManager - suspicious escalation', () => {
-  test('first Suspicious Person submission is unconfirmed and opens the escalation confirmation', async () => {
+  test('first Suspicious Person submission is unconfirmed and replaces Classify with the full-page Escalate screen', async () => {
     const user = await renderManager();
-    const dialog = await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
+    const page = await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
 
     expect(apiService.submitEvidenceReview).toHaveBeenCalledTimes(1);
     expect(apiService.submitEvidenceReview).toHaveBeenCalledWith(5, { classification: 'SUSPICIOUS_PERSON', notes: '' });
-    expect(within(dialog).getByText('Escalate Suspicious Evidence')).toBeInTheDocument();
-    expect(within(dialog).getByText(/Confirming will create a Threat Alert/)).toBeInTheDocument();
-    expect(within(dialog).getByText('IMG-WILP01-0001')).toBeInTheDocument();
-    expect(within(dialog).getByText('HIGH')).toBeInTheDocument();
-    expect(within(dialog).getByText('Park Anti-Poaching Response Team')).toBeInTheDocument();
-    expect(within(dialog).getByText(/shown for information only and are not recorded/)).toBeInTheDocument();
-  });
-
-  test('Confirm Escalation requires a non-whitespace justification', async () => {
-    const user = await renderManager();
-    await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
-
-    expect(confirmEscalationButton()).toBeDisabled();
-    await user.type(screen.getByRole('textbox', { name: /Escalation Justification/ }), '    ');
-    expect(confirmEscalationButton()).toBeDisabled();
-    await user.type(screen.getByRole('textbox', { name: /Escalation Justification/ }), 'Rifle visible');
-    expect(confirmEscalationButton()).toBeEnabled();
-  });
-
-  test('incomplete metadata is repeated in the modal and must be acknowledged before escalation', async () => {
-    const user = await renderManager();
-    const dialog = await startSuspiciousEscalation(user, 'IMG-YALA02-0001', detail(3));
-
-    expect(within(dialog).getByText('Incomplete Metadata')).toBeInTheDocument();
-    await user.type(within(dialog).getByRole('textbox', { name: /Escalation Justification/ }), JUSTIFICATION);
-    expect(confirmEscalationButton()).toBeDisabled();
-    await user.click(within(dialog).getByRole('checkbox', { name: 'I have reviewed the incomplete metadata' }));
-    expect(confirmEscalationButton()).toBeEnabled();
-  });
-
-  test('Cancel closes the escalation without a second request and nothing is escalated', async () => {
-    const user = await renderManager();
-    await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
-    await user.type(screen.getByRole('textbox', { name: /Escalation Justification/ }), JUSTIFICATION);
-
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
-
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByText('Classify Evidence')).not.toBeInTheDocument();
+    expect(within(page).getByRole('note', { name: 'Escalation warning' }))
+      .toHaveTextContent('You are escalating this evidence. Please confirm the details before creating a threat alert.');
+    const summary = within(page).getByRole('region', { name: 'Evidence Summary' });
+    expect(summary).toHaveTextContent('IMG-WILP01-0001');
+    expect(summary).toHaveTextContent('Suspicious Person');
+    expect(within(page).getByLabelText(/Threat Priority/)).toHaveValue('High');
+    expect(within(page).getByLabelText(/Recipient \/ Team/)).toHaveValue('Ranger Team');
+  });
+
+  test('Confirm Escalation requires a non-whitespace reason and the image to have loaded', async () => {
+    const user = await renderManager();
+    const page = await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5), { loadImage: false });
+
+    expect(confirmEscalationButton()).toBeDisabled();
+    await user.type(escalationReasonBox(), '    ');
+    expect(confirmEscalationButton()).toBeDisabled();
+    await user.type(escalationReasonBox(), 'Rifle visible');
+    expect(within(page).getByText('17 / 500')).toBeInTheDocument();
+    expect(confirmEscalationButton()).toBeDisabled();
+    fireEvent.load(screen.getByAltText('Camera-trap evidence IMG-WILP01-0001'));
+    expect(confirmEscalationButton()).toBeEnabled();
+  });
+
+  test('incomplete metadata is repeated on the Escalate screen and must be acknowledged before escalation', async () => {
+    const user = await renderManager();
+    const page = await startSuspiciousEscalation(user, 'IMG-YALA02-0001', detail(3));
+
+    expect(within(page).getByText('Incomplete Metadata')).toBeInTheDocument();
+    await user.type(escalationReasonBox(), JUSTIFICATION);
+    expect(confirmEscalationButton()).toBeDisabled();
+    await user.click(within(page).getByRole('checkbox', { name: 'I have reviewed the incomplete metadata' }));
+    expect(confirmEscalationButton()).toBeEnabled();
+  });
+
+  test('Cancel returns to Classify Evidence without a second request and nothing is escalated', async () => {
+    const user = await renderManager();
+    await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
+    await user.type(escalationReasonBox(), JUSTIFICATION);
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('heading', { name: /Escalate Suspicious Evidence/ })).not.toBeInTheDocument();
     expect(screen.getByText('Classify Evidence')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Suspicious Person/ })).toBeChecked();
+    expect(apiService.submitEvidenceReview).toHaveBeenCalledTimes(1);
+    // The classify image is shown again and must load before the review can be resubmitted
+    expect(confirmReviewButton()).toBeDisabled();
+    fireEvent.load(screen.getByAltText('Camera-trap evidence IMG-WILP01-0001'));
+    expect(confirmReviewButton()).toBeEnabled();
+  });
+
+  test('while the escalation is submitting, Confirm Escalation cannot be pressed again', async () => {
+    const user = await renderManager();
+    await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
+    let resolveEscalation;
+    apiService.submitEvidenceReview.mockReturnValueOnce(new Promise((resolve) => { resolveEscalation = resolve; }));
+
+    await user.type(escalationReasonBox(), JUSTIFICATION);
+    await user.click(confirmEscalationButton());
+
+    const pending = screen.getByRole('button', { name: /Escalating…/ });
+    expect(pending).toBeDisabled();
+    await user.click(pending);
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(apiService.submitEvidenceReview).toHaveBeenCalledTimes(2);
+
+    resolveEscalation({ data: escalatedResult(5, JUSTIFICATION) });
+    expect(await screen.findByText('Review Completed')).toBeInTheDocument();
+  });
+
+  test('an image failure on the Escalate screen blocks escalation; Retry recovers and Back to Review Queue escalates nothing', async () => {
+    const user = await renderManager();
+    await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5), { loadImage: false });
+    fireEvent.error(screen.getByAltText('Camera-trap evidence IMG-WILP01-0001'));
+    await user.type(escalationReasonBox(), JUSTIFICATION);
+
+    expect(screen.getByText('Image could not be loaded')).toBeInTheDocument();
+    expect(confirmEscalationButton()).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: /Retry/ }));
+    fireEvent.load(screen.getByAltText('Camera-trap evidence IMG-WILP01-0001'));
+    expect(confirmEscalationButton()).toBeEnabled();
+
+    fireEvent.error(screen.getByAltText('Camera-trap evidence IMG-WILP01-0001'));
+    await user.click(screen.getByRole('button', { name: /Back to Review Queue/ }));
+    expect(await screen.findByText('Camera-Trap Evidence Review')).toBeInTheDocument();
     expect(apiService.submitEvidenceReview).toHaveBeenCalledTimes(1);
   });
 
@@ -246,28 +308,33 @@ describe('EvidenceReviewManager - suspicious escalation', () => {
     await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
     apiService.submitEvidenceReview.mockResolvedValueOnce({ data: escalatedResult(5, JUSTIFICATION) });
 
-    await user.type(screen.getByRole('textbox', { name: /Escalation Justification/ }), JUSTIFICATION);
+    await user.type(escalationReasonBox(), JUSTIFICATION);
     await user.click(confirmEscalationButton());
 
+    expect(apiService.submitEvidenceReview).toHaveBeenCalledTimes(2);
     expect(apiService.submitEvidenceReview).toHaveBeenLastCalledWith(5, {
       classification: 'SUSPICIOUS_PERSON', notes: '', escalationConfirmed: true, escalationJustification: JUSTIFICATION,
     });
     expect(await screen.findByText('Review Completed')).toBeInTheDocument();
-    expect(screen.getByText('Reviewed – Escalated')).toBeInTheDocument();
-    expect(screen.getByText('#3')).toBeInTheDocument();
+    expect(within(resultBanner()).getByText('Reviewed – Escalated')).toBeInTheDocument();
+    expect(within(outcomeColumn()).getByText('Reviewed – Escalated')).toBeInTheDocument();
+    expect(within(outcomeColumn()).getByText('TA-2026-0003')).toBeInTheDocument();
     expect(screen.getByText('Linked to Image')).toBeInTheDocument();
+    expect(screen.getByRole('note', { name: 'Threat alert information' }))
+      .toHaveTextContent('A threat alert has been created and is linked to the original camera-trap image.');
   });
 
   test('View Alert shows the alert details returned by the review', async () => {
     const user = await renderManager();
     await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
     apiService.submitEvidenceReview.mockResolvedValueOnce({ data: escalatedResult(5, JUSTIFICATION) });
-    await user.type(screen.getByRole('textbox', { name: /Escalation Justification/ }), JUSTIFICATION);
+    await user.type(escalationReasonBox(), JUSTIFICATION);
     await user.click(confirmEscalationButton());
 
     await user.click(await screen.findByRole('button', { name: /View Alert/ }));
     const details = screen.getByRole('region', { name: 'Threat alert details' });
-    expect(within(details).getByText('Threat Alert #3')).toBeInTheDocument();
+    expect(within(details).getByText('Threat Alert TA-2026-0003')).toBeInTheDocument();
+    expect(within(details).getByText('#3')).toBeInTheDocument();
     expect(within(details).getByText('OPEN')).toBeInTheDocument();
     expect(within(details).getByText('IMG-WILP01-0001 (image #5)')).toBeInTheDocument();
     expect(within(details).getByText(JUSTIFICATION)).toBeInTheDocument();
@@ -275,17 +342,31 @@ describe('EvidenceReviewManager - suspicious escalation', () => {
 });
 
 describe('EvidenceReviewManager - API error handling', () => {
-  test('400 on escalation is shown inside the modal', async () => {
+  test('400 on escalation is shown on the Escalate screen and the officer can try again', async () => {
     const user = await renderManager();
-    await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
+    const page = await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
     apiService.submitEvidenceReview.mockRejectedValueOnce(
       apiError(400, 'An escalation justification is required to confirm escalation of suspicious evidence.'),
     );
-    await user.type(screen.getByRole('textbox', { name: /Escalation Justification/ }), JUSTIFICATION);
+    await user.type(escalationReasonBox(), JUSTIFICATION);
     await user.click(confirmEscalationButton());
 
-    expect(await within(screen.getByRole('dialog')).findByRole('alert'))
-      .toHaveTextContent('An escalation justification is required');
+    expect(await within(page).findByRole('alert')).toHaveTextContent('An escalation justification is required');
+    expect(confirmEscalationButton()).toBeEnabled();
+  });
+
+  test('409 on escalation returns to a refreshed queue explaining the evidence was already reviewed', async () => {
+    const user = await renderManager();
+    await startSuspiciousEscalation(user, 'IMG-WILP01-0001', detail(5));
+    apiService.submitEvidenceReview.mockRejectedValueOnce(
+      apiError(409, 'Evidence IMG-WILP01-0001 has already been reviewed (REVIEWED_ESCALATED) and cannot be reviewed again.'),
+    );
+    await user.type(escalationReasonBox(), JUSTIFICATION);
+    await user.click(confirmEscalationButton());
+
+    expect(await screen.findByText(/has already been reviewed/)).toBeInTheDocument();
+    expect(screen.getByText('Camera-Trap Evidence Review')).toBeInTheDocument();
+    await waitFor(() => expect(apiService.getEvidenceReviewQueue).toHaveBeenCalledTimes(2));
   });
 
   test('401 while loading the queue shows a session-expired message', async () => {

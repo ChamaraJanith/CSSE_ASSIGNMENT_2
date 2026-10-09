@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import {
   QUEUE_TABS, applyQueueFilters, countByTab, describeApiError, filterBySearch, filterByStatus, filterByTab,
-  formatDateTime, formatLocation, formatValue, getClassificationLabel, getMissingMetadataLabels, getPageNumbers,
+  formatDateTime, formatLocation, formatThreatAlertId, formatValue, getClassificationLabel, getMissingMetadataLabels, getPageNumbers,
   getStatusLabel, paginate, sortByCaptureTimeDesc,
 } from '../evidenceReviewUtils';
 import { queueItems } from './fixtures';
@@ -96,5 +96,24 @@ describe('evidenceReviewUtils', () => {
     expect(describeApiError({ status: 404 })).toMatch(/could not be found/);
     expect(describeApiError({ status: 409, message: 'Evidence X has already been reviewed' })).toBe('Evidence X has already been reviewed');
     expect(describeApiError(new TypeError('Failed to fetch'))).toMatch(/Unable to reach/);
+  });
+
+  test('threat alert ids are formatted for display as TA-<created year>-<4-digit id> without changing the id', () => {
+    expect(formatThreatAlertId(1, '2026-10-07T05:00:00+00:00')).toBe('TA-2026-0001');
+    expect(formatThreatAlertId(18, '2026-10-07T05:00:00+00:00')).toBe('TA-2026-0018');
+    expect(formatThreatAlertId('182', '2026-01-15T00:00:00+00:00')).toBe('TA-2026-0182');
+    expect(formatThreatAlertId(12345, '2026-10-07T05:00:00+00:00')).toBe('TA-2026-12345');
+    // The year follows park local time (UTC+05:30): 31 Dec 20:00 UTC is already 1 Jan in Sri Lanka
+    expect(formatThreatAlertId(7, '2025-12-31T20:00:00+00:00')).toBe('TA-2026-0007');
+  });
+
+  test('threat alert id formatting is deterministic and never invents a year or id', () => {
+    const createdAt = '2026-10-07T05:00:00+00:00';
+    expect(formatThreatAlertId(3, createdAt)).toBe(formatThreatAlertId(3, createdAt));
+    expect(formatThreatAlertId(3, null)).toBe('TA-0003');
+    expect(formatThreatAlertId(3, 'not-a-date')).toBe('TA-0003');
+    expect(formatThreatAlertId(null, createdAt)).toBe('Not recorded');
+    expect(formatThreatAlertId('abc', createdAt)).toBe('Not recorded');
+    expect(formatThreatAlertId(-1, createdAt)).toBe('Not recorded');
   });
 });

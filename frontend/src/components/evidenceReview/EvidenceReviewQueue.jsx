@@ -83,7 +83,7 @@ export default function EvidenceReviewQueue({ items, loading, error, notice, onR
   return (
     <div className="panel-card er-panel er-queue">
       <div className="panel-header">
-        <div className="panel-title"><ScanSearch size={20} /> Camera-Trap Evidence Review</div>
+        <h2 className="panel-title er-page-title">Camera-Trap Evidence Review</h2>
       </div>
 
       {notice && (

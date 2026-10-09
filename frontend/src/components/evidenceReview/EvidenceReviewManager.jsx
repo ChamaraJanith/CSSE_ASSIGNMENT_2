@@ -3,13 +3,13 @@ import { AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { apiService } from '../../services/api';
 import EvidenceReviewQueue from './EvidenceReviewQueue';
 import ClassifyEvidenceView from './ClassifyEvidenceView';
-import EscalationConfirmationModal from './EscalationConfirmationModal';
+import EscalateEvidenceView from './EscalateEvidenceView';
 import ReviewResultView from './ReviewResultView';
 import { CLASSIFICATIONS, IMAGE_STATUS, describeApiError } from './evidenceReviewUtils';
 import '../../pages/PatrolPlanning.css';
 import '../../pages/EvidenceReview.css';
 
-const SCREENS = Object.freeze({ QUEUE: 'QUEUE', CLASSIFY: 'CLASSIFY', RESULT: 'RESULT' });
+const SCREENS = Object.freeze({ QUEUE: 'QUEUE', CLASSIFY: 'CLASSIFY', ESCALATE: 'ESCALATE', RESULT: 'RESULT' });
 
 export default function EvidenceReviewManager() {
   const [screen, setScreen] = useState(SCREENS.QUEUE);
@@ -31,7 +31,6 @@ export default function EvidenceReviewManager() {
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState(null);
 
-  const [escalationOpen, setEscalationOpen] = useState(false);
   const [justification, setJustification] = useState('');
   const [metadataAcknowledged, setMetadataAcknowledged] = useState(false);
   const [escalationError, setEscalationError] = useState(null);
@@ -67,7 +66,6 @@ export default function EvidenceReviewManager() {
 
   const returnToQueue = ({ reload = false, notice = null } = {}) => {
     setScreen(SCREENS.QUEUE);
-    setEscalationOpen(false);
     setResult(null);
     setQueueNotice(notice);
     if (reload) reloadQueue();
@@ -107,9 +105,14 @@ export default function EvidenceReviewManager() {
     showError(describeApiError(error));
   };
 
+  // Classify and Escalate each render their own copy of the image, so it must load again on every switch
+  const showEvidenceScreen = (nextScreen) => {
+    setImageStatus(IMAGE_STATUS.LOADING);
+    setScreen(nextScreen);
+  };
+
   const showResult = (data) => {
     setResult(data);
-    setEscalationOpen(false);
     setScreen(SCREENS.RESULT);
   };
 
@@ -124,7 +127,7 @@ export default function EvidenceReviewManager() {
         setJustification('');
         setMetadataAcknowledged(false);
         setEscalationError(null);
-        setEscalationOpen(true);
+        showEvidenceScreen(SCREENS.ESCALATE);
       }
     } catch (error) {
       handleReviewError(error, setActionError);
@@ -163,6 +166,27 @@ export default function EvidenceReviewManager() {
     );
   }
 
+  if (screen === SCREENS.ESCALATE && evidence) {
+    return (
+      <div className="er-container">
+        <EscalateEvidenceView
+          evidence={evidence}
+          justification={justification}
+          metadataAcknowledged={metadataAcknowledged}
+          imageStatus={imageStatus}
+          submitting={submitting}
+          error={escalationError}
+          onJustificationChange={setJustification}
+          onMetadataAcknowledgedChange={setMetadataAcknowledged}
+          onImageStatusChange={setImageStatus}
+          onCancel={() => showEvidenceScreen(SCREENS.CLASSIFY)}
+          onConfirm={handleConfirmEscalation}
+          onBackToQueue={() => returnToQueue()}
+        />
+      </div>
+    );
+  }
+
   if (screen === SCREENS.CLASSIFY) {
     return (
       <div className="er-container">
@@ -191,7 +215,7 @@ export default function EvidenceReviewManager() {
             classification={classification}
             notes={notes}
             imageStatus={imageStatus}
-            submitting={submitting && !escalationOpen}
+            submitting={submitting}
             error={actionError}
             onClassificationChange={setClassification}
             onNotesChange={setNotes}
@@ -199,20 +223,6 @@ export default function EvidenceReviewManager() {
             onCancel={() => returnToQueue()}
             onConfirm={handleConfirmReview}
             onBackToQueue={() => returnToQueue()}
-          />
-        )}
-        {evidence && escalationOpen && (
-          <EscalationConfirmationModal
-            evidence={evidence}
-            justification={justification}
-            metadataAcknowledged={metadataAcknowledged}
-            submitting={submitting}
-            imageFailed={imageStatus !== IMAGE_STATUS.LOADED}
-            error={escalationError}
-            onJustificationChange={setJustification}
-            onMetadataAcknowledgedChange={setMetadataAcknowledged}
-            onCancel={() => setEscalationOpen(false)}
-            onConfirm={handleConfirmEscalation}
           />
         )}
       </div>

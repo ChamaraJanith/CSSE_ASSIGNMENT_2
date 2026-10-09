@@ -23,6 +23,10 @@ export const QUEUE_TABS = Object.freeze({
 export const IMAGE_STATUS = Object.freeze({ LOADING: 'loading', LOADED: 'loaded', ERROR: 'error' });
 
 export const ALL_STATUSES = 'ALL';
+// UI limit for optional review notes (wireframe "0 / 500" counter)
+export const NOTES_MAX_LENGTH = 500;
+// UI limit for the escalation reason (wireframe "0 / 500" counter); the backend does not enforce it
+export const ESCALATION_REASON_MAX_LENGTH = 500;
 export const NOT_RECORDED = 'Not recorded';
 
 const STATUS_LABELS = {
@@ -153,6 +157,20 @@ export const formatDateTime = (value) => {
   if (isBlank(value)) return NOT_RECORDED;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? NOT_RECORDED : dateTimeFormatter.format(date);
+};
+
+const yearFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Colombo', year: 'numeric' });
+
+// Display-only alert reference in the wireframe style (TA-2026-0018). Built from the real numeric alert id and the
+// year the alert was created (park local time); the id the API uses is never changed.
+export const formatThreatAlertId = (id, createdAt) => {
+  const number = Number(id);
+  if (isBlank(id) || !Number.isInteger(number) || number < 0) return NOT_RECORDED;
+  const sequence = String(number).padStart(4, '0');
+  const created = isBlank(createdAt) ? null : new Date(createdAt);
+  return created && !Number.isNaN(created.getTime())
+    ? `TA-${yearFormatter.format(created)}-${sequence}`
+    : `TA-${sequence}`;
 };
 
 export const formatValue = (value, unit = '') => (isBlank(value) ? NOT_RECORDED : `${value}${unit}`);
