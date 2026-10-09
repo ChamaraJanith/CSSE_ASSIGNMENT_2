@@ -94,6 +94,18 @@ export const getOptionLabel = (options, value) => {
   return option ? option.label : value;
 };
 
+export const NO_RESPONSE_BEHAVIOUR = 'Not selected';
+
+const isKnownOption = (options, value) => (options || []).some((entry) => entry.value === value);
+
+// Rules saved before the response behaviours were defined can hold a retired code; once the options
+// have loaded, such a value is shown as "Not selected" instead of the raw code.
+export const formatResponseBehaviour = (options, value) => {
+  if (isBlank(value)) return NOT_RECORDED;
+  if (Array.isArray(options) && options.length > 0 && !isKnownOption(options, value)) return NO_RESPONSE_BEHAVIOUR;
+  return getOptionLabel(options, value);
+};
+
 export const formatRecipients = (options, values) =>
   Array.isArray(values) && values.length > 0
     ? values.map((value) => getOptionLabel(options, value)).join(', ')
@@ -149,15 +161,23 @@ export const countByTab = (rules) => ({
   [LIST_TABS.INACTIVE]: filterByTab(rules, LIST_TABS.INACTIVE).length,
 });
 
-// A saved rule's values in the configuration-form shape (the inverse of buildRulePayload)
-export const toRuleForm = (rule) => ({
-  hazardType: rule?.hazardType || '',
-  riskZoneId: rule?.riskZoneId ?? '',
-  alertPriority: rule?.alertPriority || '',
-  notificationRecipients: Array.isArray(rule?.notificationRecipients) ? [...rule.notificationRecipients] : [],
-  responseBehaviour: rule?.responseBehaviour || '',
-  notes: rule?.notes || '',
-});
+// A saved rule's values in the configuration-form shape (the inverse of buildRulePayload).
+// With `options`, a retired response behaviour is cleared so the select asks for a current one.
+export const toRuleForm = (rule, options) => {
+  const responseBehaviour = rule?.responseBehaviour || '';
+  const responseOptions = options?.responseBehaviours;
+  const retired = Array.isArray(responseOptions) && responseOptions.length > 0
+    && responseBehaviour !== '' && !isKnownOption(responseOptions, responseBehaviour);
+
+  return {
+    hazardType: rule?.hazardType || '',
+    riskZoneId: rule?.riskZoneId ?? '',
+    alertPriority: rule?.alertPriority || '',
+    notificationRecipients: Array.isArray(rule?.notificationRecipients) ? [...rule.notificationRecipients] : [],
+    responseBehaviour: retired ? '' : responseBehaviour,
+    notes: rule?.notes || '',
+  };
+};
 
 /**
  * Request body for validate / create. Ids are numbers; unselected values stay empty so the

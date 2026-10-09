@@ -2,7 +2,8 @@ import React from 'react';
 import { Shield, Plus, RefreshCw, AlertTriangle, CheckCircle2, Eye } from 'lucide-react';
 import RuleStatusBadge from './RuleStatusBadge';
 import {
-  LIST_TABS, countByTab, filterByTab, formatDateTime, formatRecipients, getOptionLabel, getRuleZoneLabel,
+  LIST_TABS, countByTab, filterByTab, formatDateTime, formatRecipients, formatResponseBehaviour, getOptionLabel,
+  getRuleZoneLabel,
 } from './monitoringRuleUtils';
 
 const TABS = [
@@ -110,7 +111,7 @@ export default function MonitoringRuleList({
                     </span>
                   </td>
                   <td>{formatRecipients(options?.recipientRoles, rule.notificationRecipients)}</td>
-                  <td>{getOptionLabel(options?.responseBehaviours, rule.responseBehaviour)}</td>
+                  <td>{formatResponseBehaviour(options?.responseBehaviours, rule.responseBehaviour)}</td>
                   <td><RuleStatusBadge status={rule.status} /></td>
                   <td>{formatDateTime(rule.createdAt)}</td>
                   <td>

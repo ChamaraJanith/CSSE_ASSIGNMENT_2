@@ -17,9 +17,15 @@ const HAZARD_TYPES = freezeOptions([
   { value: 'ILLEGAL_GRAZING_TIMBER_CLEARING', label: 'Illegal Cattle Grazing & Timber Clearing' } // RZ-UDAW-02
 ]);
 
-// UNCONFIRMED – replace with Assignment 02 values.
+// Project-defined response behaviours (the Assignment 02 specification does not list any).
+// UC04 only stores the chosen behaviour as rule configuration; it does not notify or create incidents.
+// Rules saved before these values existed may still hold the retired 'PLACEHOLDER_RESPONSE' code:
+// they display safely, and a draft must pick one of these values before it can be saved or activated.
 const RESPONSE_BEHAVIOURS = freezeOptions([
-  { value: 'PLACEHOLDER_RESPONSE', label: 'Response behaviour (to be confirmed)' }
+  { value: 'NOTIFY_RECIPIENTS', label: 'Notify Recipients' },
+  { value: 'CREATE_INCIDENT', label: 'Create Incident' },
+  { value: 'NOTIFY_AND_CREATE_INCIDENT', label: 'Notify & Create Incident' },
+  { value: 'NOTIFY_AND_ESCALATE', label: 'Notify & Escalate' }
 ]);
 
 // Reuses the existing severity vocabulary (risk_zones.severity_level, patrol_plans.priority)

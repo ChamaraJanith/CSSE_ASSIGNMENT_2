@@ -714,6 +714,23 @@ describe('UC04: Monitoring Rule Service', () => {
       ]);
     });
 
+    test('[POSITIVE CASE] the response behaviour of a draft can be changed and is stored', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [draft({ response_behaviour: 'NOTIFY_RECIPIENTS' })] });
+      const updated = await monitoringRuleService.updateDraft(10, ruleInput({ responseBehaviour: 'NOTIFY_AND_ESCALATE' }), MANAGER_ID);
+
+      expect(updated).toMatchObject({ id: 10, status: 'DRAFT', responseBehaviour: 'NOTIFY_AND_ESCALATE' });
+      expect(db.find('UPDATE public.monitoring_rules')[0].params[5]).toBe('NOTIFY_AND_ESCALATE');
+    });
+
+    test('[POSITIVE CASE] a draft saved with the retired PLACEHOLDER_RESPONSE can be edited to a current behaviour', async () => {
+      createRulePgFake(getPool, { existingRules: [draft({ response_behaviour: 'PLACEHOLDER_RESPONSE' })] });
+      await expect(monitoringRuleService.updateDraft(10, ruleInput({ responseBehaviour: 'PLACEHOLDER_RESPONSE' }), MANAGER_ID))
+        .rejects.toMatchObject({ status: 400, errors: [expect.objectContaining({ field: 'responseBehaviour', code: 'INVALID_VALUE' })] });
+
+      const updated = await monitoringRuleService.updateDraft(10, ruleInput({ responseBehaviour: 'CREATE_INCIDENT' }), MANAGER_ID);
+      expect(updated.responseBehaviour).toBe('CREATE_INCIDENT');
+    });
+
     test('[POSITIVE CASE] saving an unchanged draft should not conflict with itself', async () => {
       createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' })] });
       await expect(monitoringRuleService.updateDraft(10, ruleInput(), MANAGER_ID)).resolves.toMatchObject({ id: 10 });
@@ -897,6 +914,22 @@ describe('UC04: Monitoring Rule Service', () => {
       expect(db.find('UPDATE')).toHaveLength(0);
     });
 
+    test('[POSITIVE CASE] activation keeps the selected response behaviour', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT', response_behaviour: 'NOTIFY_AND_CREATE_INCIDENT' })] });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID))
+        .resolves.toMatchObject({ status: 'ACTIVE', responseBehaviour: 'NOTIFY_AND_CREATE_INCIDENT' });
+    });
+
+    test('[NEGATIVE CASE] a draft with the retired PLACEHOLDER_RESPONSE must be edited before activation', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT', response_behaviour: 'PLACEHOLDER_RESPONSE' })] });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID)).rejects.toMatchObject({
+        status: 400,
+        message: expect.stringMatching(/Edit the draft before activating it/),
+        errors: [expect.objectContaining({ field: 'responseBehaviour', code: 'INVALID_VALUE' })]
+      });
+      expect(db.find('UPDATE')).toHaveLength(0);
+    });
+
     test('[NEGATIVE CASE] a risk zone that no longer belongs to the park should return 400', async () => {
       createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' })], zone: zoneRow({ park_id: 3 }) });
       await expect(monitoringRuleService.activateRule(10, MANAGER_ID))
@@ -962,6 +995,14 @@ describe('UC04: Monitoring Rule Service', () => {
       expect(update.params).toEqual([12, 'INACTIVE', false]);
       expect(update.sql).toMatch(/activated_at = CASE WHEN \$3::boolean THEN NOW\(\) ELSE NULL END, updated_at = NOW\(\)/);
     });
+
+    test.each(['NOTIFY_AND_ESCALATE', 'PLACEHOLDER_RESPONSE'])(
+      '[POSITIVE CASE] deactivation keeps the stored response behaviour %s', async (responseBehaviour) => {
+        createRulePgFake(getPool, { existingRules: [activeRule({ response_behaviour: responseBehaviour })] });
+        await expect(monitoringRuleService.deactivateRule(12, MANAGER_ID))
+          .resolves.toMatchObject({ status: 'INACTIVE', responseBehaviour });
+      }
+    );
 
     test.each(['DRAFT', 'INACTIVE'])('[NEGATIVE CASE] a %s rule cannot be deactivated (409)', async (status) => {
       const db = createRulePgFake(getPool, { existingRules: [activeRule({ status, activated_at: null })] });

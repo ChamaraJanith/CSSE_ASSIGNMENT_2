@@ -42,7 +42,7 @@ const reviewRule = (park, zone) => ({
   riskZoneId: zone.id,
   alertPriority: 'HIGH',
   notificationRecipients: ['wildlife_officer', 'park_manager'],
-  responseBehaviour: 'PLACEHOLDER_RESPONSE',
+  responseBehaviour: 'NOTIFY_RECIPIENTS',
   notes: '',
 });
 

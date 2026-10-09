@@ -134,7 +134,7 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
 
   const startNewRule = () => openConfiguration(EMPTY_RULE_FORM, null);
 
-  const startEditRule = (rule) => openConfiguration(toRuleForm(rule), rule);
+  const startEditRule = (rule) => openConfiguration(toRuleForm(rule, options), rule);
 
   const backToList = () => {
     setScreen(SCREENS.LIST);

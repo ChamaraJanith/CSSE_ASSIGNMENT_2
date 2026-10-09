@@ -70,7 +70,10 @@ export const OPTIONS = {
     { value: 'community_liaison_officer', label: 'Community Liaison Officer' },
   ],
   responseBehaviours: [
-    { value: 'PLACEHOLDER_RESPONSE', label: 'Response behaviour (to be confirmed)' },
+    { value: 'NOTIFY_RECIPIENTS', label: 'Notify Recipients' },
+    { value: 'CREATE_INCIDENT', label: 'Create Incident' },
+    { value: 'NOTIFY_AND_CREATE_INCIDENT', label: 'Notify & Create Incident' },
+    { value: 'NOTIFY_AND_ESCALATE', label: 'Notify & Escalate' },
   ],
 };
 
@@ -122,11 +125,11 @@ export const createResponse = (rule, status) => ({
 export const EXISTING_RULES = [
   createdRule({
     parkId: 1, hazardType: 'POACHING_SNARING', riskZoneId: 1, alertPriority: 'CRITICAL',
-    notificationRecipients: ['park_manager', 'wildlife_officer'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: null,
+    notificationRecipients: ['park_manager', 'wildlife_officer'], responseBehaviour: 'NOTIFY_RECIPIENTS', notes: null,
   }, 'ACTIVE', { id: 12, riskZone: { id: 1, zoneCode: 'RZ-YALA-01', zoneName: 'Northern River Basin Buffer' } }),
   createdRule({
     parkId: 1, hazardType: 'ELEPHANT_CROP_RAIDING_FENCE_BREACH', riskZoneId: 2, alertPriority: 'LOW',
-    notificationRecipients: ['community_liaison_officer'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: 'Seasonal',
+    notificationRecipients: ['community_liaison_officer'], responseBehaviour: 'NOTIFY_RECIPIENTS', notes: 'Seasonal',
   }, 'DRAFT', { id: 11 }),
 ];
 
@@ -135,7 +138,7 @@ export const UPDATED_AT = '2026-10-09T04:15:00.000Z';
 // A deactivated rule: configuration kept, activatedAt cleared by the backend
 export const INACTIVE_RULE = createdRule({
   parkId: 1, hazardType: 'ILLEGAL_FISHING_CAMPSITES', riskZoneId: 1, alertPriority: 'MEDIUM',
-  notificationRecipients: ['wildlife_officer'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: null,
+  notificationRecipients: ['wildlife_officer'], responseBehaviour: 'NOTIFY_RECIPIENTS', notes: null,
 }, 'INACTIVE', { id: 9, updatedAt: UPDATED_AT, riskZone: { id: 1, zoneCode: 'RZ-YALA-01', zoneName: 'Northern River Basin Buffer' } });
 
 // One rule of every status (ACTIVE #12, DRAFT #11, INACTIVE #9)
@@ -144,7 +147,7 @@ export const RULES_ALL_STATUSES = [...EXISTING_RULES, INACTIVE_RULE];
 // A saved ACTIVE rule of `park` in `zone`, as the list endpoint returns it (joined zone has no geometry)
 export const ruleInZone = (park, zone, overrides = {}) => createdRule({
   parkId: park.id, hazardType: 'POACHING_SNARING', riskZoneId: zone.id, alertPriority: 'HIGH',
-  notificationRecipients: ['park_manager'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: null,
+  notificationRecipients: ['park_manager'], responseBehaviour: 'NOTIFY_RECIPIENTS', notes: null,
 }, 'ACTIVE', { id: 30 + zone.id, riskZone: { id: zone.id, zoneCode: zone.zoneCode, zoneName: zone.zoneName }, ...overrides });
 
 // Mirrors an ApiService error (message + HTTP status + optional structured details)
