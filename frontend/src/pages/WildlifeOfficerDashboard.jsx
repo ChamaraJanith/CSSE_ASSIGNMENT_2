@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import {
   LayoutDashboard, MapPin, AlertTriangle,
-  ClipboardList, Camera, Settings, LogOut, ShieldAlert, CheckCircle, ScanSearch
+  ClipboardList, Camera, Settings, LogOut, ShieldAlert, CheckCircle, ScanSearch, CircleUser
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import EvidenceReviewManager from '../components/evidenceReview/EvidenceReviewManager';
 import './Dashboard.css';
+import './WildlifeOfficerDashboard.css';
 
 export default function WildlifeOfficerDashboard() {
   const navigate = useNavigate();
@@ -157,42 +158,42 @@ export default function WildlifeOfficerDashboard() {
   };
 
   return (
-    <div className="dashboard-layout">
+    <div className="dashboard-layout wo-dashboard">
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <ShieldAlert size={28} />
-          WildGuard
+          <ShieldAlert size={28} aria-hidden="true" />
+          <span className="sidebar-logo-text">WildGuard</span>
         </div>
         <ul className="sidebar-menu">
           <li className={`sidebar-item ${activeMenu === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveMenu('dashboard')}>
-            <LayoutDashboard className="sidebar-item-icon" /> Overview
+            <LayoutDashboard className="sidebar-item-icon" aria-hidden="true" /> <span className="sidebar-item-label">Dashboard</span>
           </li>
           <li className={`sidebar-item ${activeMenu === 'patrol' ? 'active' : ''}`} onClick={() => setActiveMenu('patrol')}>
-            <MapPin className="sidebar-item-icon" /> My Patrol Zone
+            <MapPin className="sidebar-item-icon" aria-hidden="true" /> <span className="sidebar-item-label">My Patrol Zone</span>
           </li>
           <li className={`sidebar-item ${activeMenu === 'report' ? 'active' : ''}`} onClick={() => setActiveMenu('report')}>
-            <ClipboardList className="sidebar-item-icon" /> File Report
+            <ClipboardList className="sidebar-item-icon" aria-hidden="true" /> <span className="sidebar-item-label">File Report</span>
           </li>
           <li className={`sidebar-item ${activeMenu === 'incidents' ? 'active' : ''}`} onClick={() => setActiveMenu('incidents')}>
-            <AlertTriangle className="sidebar-item-icon" /> Incidents
+            <AlertTriangle className="sidebar-item-icon" aria-hidden="true" /> <span className="sidebar-item-label">Incidents</span>
           </li>
           <li className={`sidebar-item ${activeMenu === 'sightings' ? 'active' : ''}`} onClick={() => setActiveMenu('sightings')}>
-            <Camera className="sidebar-item-icon" /> Animal Sightings
+            <Camera className="sidebar-item-icon" aria-hidden="true" /> <span className="sidebar-item-label">Animal Sightings</span>
           </li>
           <li className={`sidebar-item ${activeMenu === 'evidence' ? 'active' : ''}`} onClick={() => setActiveMenu('evidence')}>
-            <ScanSearch className="sidebar-item-icon" /> Evidence Review
+            <ScanSearch className="sidebar-item-icon" aria-hidden="true" /> <span className="sidebar-item-label">Review Queue</span>
           </li>
           <li className={`sidebar-item ${activeMenu === 'tasks' ? 'active' : ''}`} onClick={() => setActiveMenu('tasks')}>
-            <CheckCircle className="sidebar-item-icon" /> My Tasks
+            <CheckCircle className="sidebar-item-icon" aria-hidden="true" /> <span className="sidebar-item-label">My Tasks</span>
           </li>
           <li className={`sidebar-item ${activeMenu === 'settings' ? 'active' : ''}`} onClick={() => setActiveMenu('settings')}>
-            <Settings className="sidebar-item-icon" /> Settings
+            <Settings className="sidebar-item-icon" aria-hidden="true" /> <span className="sidebar-item-label">Settings</span>
           </li>
         </ul>
         <div className="sidebar-footer">
           <div className="logout-btn" onClick={handleLogout}>
-            <LogOut size={20} /> Logout
+            <LogOut size={20} aria-hidden="true" /> <span className="sidebar-item-label">Log Out</span>
           </div>
         </div>
       </aside>
@@ -203,13 +204,12 @@ export default function WildlifeOfficerDashboard() {
         <div className="bg-blob blob-bl"></div>
 
         <header className="top-header">
-          <div className="header-title">Ranger Dashboard</div>
+          <div className="header-title">Wildlife Officer Dashboard</div>
           <div className="user-profile">
+            <CircleUser size={22} className="user-profile-icon" aria-hidden="true" />
             <div className="user-info">
-              <span className="user-name">Ranger</span>
-              <span className="user-role">Field Patrol</span>
+              <span className="user-name">Wildlife Officer</span>
             </div>
-            <div className="avatar" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>RG</div>
           </div>
         </header>
 
@@ -226,7 +226,7 @@ export default function WildlifeOfficerDashboard() {
                 ].map((stat, i) => (
                   <div key={i} className="dashboard-card-full" style={{ padding: '24px', position: 'relative', zIndex: 10 }}>
                     <div style={{ fontSize: '2rem', fontWeight: 700, color: stat.color }}>{stat.value}</div>
-                    <div style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '8px' }}>{stat.label}</div>
+                    <div style={{ color: '#4b5563', fontSize: '0.9rem', marginTop: '8px' }}>{stat.label}</div>
                   </div>
                 ))}
               </div>
@@ -234,7 +234,7 @@ export default function WildlifeOfficerDashboard() {
               {/* Welcome card */}
               <div className="dashboard-card-full" style={{ position: 'relative', zIndex: 10 }}>
                 <div className="card-header">
-                  <h2>Ranger Overview</h2>
+                  <h2>Wildlife Officer Overview</h2>
                   <p>Monitor your patrol zone, log sightings and file incident reports.</p>
                 </div>
 
@@ -250,8 +250,8 @@ export default function WildlifeOfficerDashboard() {
                       key={i}
                       onClick={() => setActiveMenu(action.menu)}
                       style={{
-                        background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.07)',
+                        background: '#ffffff',
+                        border: '1px solid #e3e7e4',
                         borderRadius: '16px',
                         padding: '24px',
                         display: 'flex',
@@ -261,11 +261,11 @@ export default function WildlifeOfficerDashboard() {
                         transition: 'all 0.2s',
                         color: action.color
                       }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f6faf7'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
                     >
                       {action.icon}
-                      <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{action.label}</span>
+                      <span style={{ color: '#14281d', fontWeight: 600 }}>{action.label}</span>
                     </div>
                   ))}
                 </div>
@@ -284,10 +284,10 @@ export default function WildlifeOfficerDashboard() {
               {gpsSimulationState?.active && (
                 <div style={{ background: 'rgba(99, 102, 241, 0.1)', border: '1px solid #6366f1', padding: '16px', borderRadius: '12px', marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <h3 style={{ margin: '0 0 8px 0', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ margin: '0 0 8px 0', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <MapPin size={20} /> GPS Tracker: SIMULATING
                     </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', color: '#374151', fontSize: '0.9rem' }}>
                       <div><strong>Device:</strong> GPS-01 (Simulated)</div>
                       <div><strong>Last update:</strong> {gpsSimulationState.lastTime}</div>
                       <div><strong>Location:</strong> {gpsSimulationState.lastLat}, {gpsSimulationState.lastLng}</div>
@@ -304,7 +304,7 @@ export default function WildlifeOfficerDashboard() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
                 {assignedReports.length === 0 ? (
-                  <p style={{ color: '#94a3b8' }}>No tasks assigned currently.</p>
+                  <p style={{ color: '#4b5563' }}>No tasks assigned currently.</p>
                 ) : (
                   assignedReports.map(report => {
                     // Find the most recent assignment for this ranger
@@ -313,9 +313,9 @@ export default function WildlifeOfficerDashboard() {
                     if (!activeAssignment) return null;
 
                     return (
-                    <div key={report.report_code} style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '20px', borderRadius: '12px' }}>
+                    <div key={report.report_code} style={{ background: '#ffffff', border: '1px solid #e3e7e4', padding: '20px', borderRadius: '12px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                        <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{report.report_code}</span>
+                        <span style={{ color: '#0369a1', fontWeight: 'bold' }}>{report.report_code}</span>
                         <span style={{ 
                           padding: '4px 12px', 
                           borderRadius: '20px', 
@@ -323,17 +323,17 @@ export default function WildlifeOfficerDashboard() {
                           background: activeAssignment.status === 'PENDING' ? 'rgba(245, 158, 11, 0.2)' : 
                                       activeAssignment.status === 'ACCEPTED' ? 'rgba(16, 185, 129, 0.2)' : 
                                       activeAssignment.status === 'DECLINED' ? 'rgba(239, 68, 68, 0.2)' : 
-                                      activeAssignment.status === 'RESPONDING' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.1)',
+                                      activeAssignment.status === 'RESPONDING' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(0,0,0,0.06)',
                           color: activeAssignment.status === 'PENDING' ? '#f59e0b' : 
                                  activeAssignment.status === 'ACCEPTED' ? '#10b981' : 
                                  activeAssignment.status === 'DECLINED' ? '#ef4444' : 
-                                 activeAssignment.status === 'RESPONDING' ? '#38bdf8' : '#e2e8f0'
+                                 activeAssignment.status === 'RESPONDING' ? '#0369a1' : '#374151'
                         }}>
                           {activeAssignment.status || 'UNKNOWN'}
                         </span>
                       </div>
-                      <p style={{ color: '#e2e8f0', margin: '0 0 8px 0' }}><strong>Incident:</strong> {report.incident_type}</p>
-                      <p style={{ color: '#e2e8f0', margin: '0 0 16px 0' }}><strong>Location:</strong> {report.area} — {report.landmark}</p>
+                      <p style={{ color: '#1f2937', margin: '0 0 8px 0' }}><strong>Incident:</strong> {report.incident_type}</p>
+                      <p style={{ color: '#1f2937', margin: '0 0 16px 0' }}><strong>Location:</strong> {report.area} — {report.landmark}</p>
                       
                       {activeAssignment.status === 'PENDING' && (
                         <div style={{ display: 'flex', gap: '12px' }}>
@@ -405,7 +405,7 @@ export default function WildlifeOfficerDashboard() {
           {activeMenu === 'evidence' && <EvidenceReviewManager />}
 
           {activeMenu !== 'dashboard' && activeMenu !== 'tasks' && activeMenu !== 'evidence' && (
-            <div className="dashboard-card-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px', color: '#94a3b8', position: 'relative', zIndex: 10 }}>
+            <div className="dashboard-card-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px', color: '#4b5563', position: 'relative', zIndex: 10 }}>
               <h3>This module is under construction.</h3>
             </div>
           )}

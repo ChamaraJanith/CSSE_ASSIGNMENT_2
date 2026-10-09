@@ -1,0 +1,241 @@
+/* ==============================================================================
+   WildGuard - Wildlife Officer Dashboard shell
+   Green sidebar and header with a light main area, from the UC02 high-fidelity
+   wireframes. Every rule is scoped to .wo-dashboard, so the shared Dashboard.css
+   shell used by the other role dashboards is unchanged.
+   ============================================================================== */
+
+.wo-dashboard {
+  --wo-green: #17422f;
+  --wo-green-hover: rgba(255, 255, 255, 0.08);
+  --wo-green-active: #456b30;
+  --wo-green-divider: rgba(255, 255, 255, 0.12);
+  --wo-nav-text: #e6efe9;
+  --wo-main-bg: #f7f8f6;
+  --wo-heading: #14281d;
+  --wo-text: #1f2937;
+  --wo-text-muted: #4b5563;
+  --wo-border: #e3e7e4;
+
+  background: var(--wo-main-bg);
+  color: var(--wo-text);
+}
+
+/* --- Sidebar --- */
+.wo-dashboard .sidebar {
+  width: 240px;
+  min-width: 240px;
+  padding: 0 0 16px;
+  background: var(--wo-green);
+  backdrop-filter: none;
+  border-right: none;
+}
+
+/* Logo block lines up with the green header bar */
+.wo-dashboard .sidebar-logo {
+  height: 70px;
+  min-height: 70px;
+  margin-bottom: 16px;
+  padding: 0 20px;
+  color: #fff;
+  font-size: 1.2rem;
+  border-bottom: 1px solid var(--wo-green-divider);
+}
+
+.wo-dashboard .sidebar-menu {
+  gap: 4px;
+}
+
+.wo-dashboard .sidebar-item {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  color: var(--wo-nav-text);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.wo-dashboard .sidebar-item:hover {
+  background: var(--wo-green-hover);
+  color: #fff;
+}
+
+.wo-dashboard .sidebar-item.active {
+  background: var(--wo-green-active);
+  color: #fff;
+  font-weight: 600;
+  border: none;
+  box-shadow: none;
+}
+
+.wo-dashboard .sidebar-footer {
+  padding: 12px;
+  border-top: 1px solid var(--wo-green-divider);
+}
+
+.wo-dashboard .logout-btn {
+  color: var(--wo-nav-text);
+  font-weight: 500;
+  font-size: 0.88rem;
+}
+
+.wo-dashboard .logout-btn:hover {
+  background: var(--wo-green-hover);
+  color: #fff;
+}
+
+/* --- Header bar --- */
+.wo-dashboard .top-header {
+  gap: 16px;
+  background: var(--wo-green);
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--wo-green-divider);
+}
+
+.wo-dashboard .header-title {
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.wo-dashboard .user-profile {
+  gap: 8px;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  color: #fff;
+}
+
+.wo-dashboard .user-profile-icon {
+  flex-shrink: 0;
+}
+
+.wo-dashboard .user-name {
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- Main area --- */
+/* index.css declares `color-scheme: light dark`; the main area is always light,
+   so native radios, checkboxes, selects and scrollbars must render light too */
+.wo-dashboard .main-content {
+  background: var(--wo-main-bg);
+  color-scheme: light;
+}
+
+.wo-dashboard .bg-blob {
+  display: none;
+}
+
+/* Overview / My Tasks / placeholder cards: white cards on the light main area */
+.wo-dashboard .dashboard-card-full {
+  background: #fff;
+  border: 1px solid var(--wo-border);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(16, 40, 28, 0.08);
+  color: var(--wo-text);
+}
+
+.wo-dashboard .card-header h2 {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  color: var(--wo-heading);
+}
+
+.wo-dashboard .card-header p {
+  margin: 0 0 16px;
+  color: var(--wo-text-muted);
+}
+
+/* UC02 screens sit directly on the light main area, as in the wireframes.
+   The queue keeps its white card; the other screens drop the outer surface so
+   their white cards are not boxed twice. */
+.wo-dashboard .er-container .er-panel {
+  box-shadow: 0 1px 3px rgba(16, 40, 28, 0.08);
+}
+
+.wo-dashboard .er-container .er-panel:not(.er-queue) {
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* --- Responsive --- */
+@media (max-width: 1024px) {
+  .wo-dashboard .sidebar {
+    width: 210px;
+    min-width: 210px;
+  }
+
+  .wo-dashboard .top-header {
+    padding: 0 24px;
+  }
+
+  .wo-dashboard .content-area {
+    padding: 20px 24px;
+  }
+}
+
+/* Phones: icon-only sidebar; labels stay in the accessibility tree */
+@media (max-width: 640px) {
+  .wo-dashboard .sidebar {
+    width: 64px;
+    min-width: 64px;
+  }
+
+  .wo-dashboard .sidebar-logo {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .wo-dashboard .sidebar-menu {
+    padding: 0 8px;
+  }
+
+  .wo-dashboard .sidebar-item,
+  .wo-dashboard .logout-btn {
+    justify-content: center;
+    padding: 12px 0;
+  }
+
+  .wo-dashboard .sidebar-footer {
+    padding: 12px 8px;
+  }
+
+  .wo-dashboard .sidebar-logo-text,
+  .wo-dashboard .sidebar-item-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .wo-dashboard .top-header {
+    height: auto;
+    min-height: 70px;
+    padding: 10px 16px;
+  }
+
+  .wo-dashboard .header-title {
+    font-size: 0.98rem;
+    line-height: 1.25;
+  }
+
+  .wo-dashboard .user-profile {
+    padding: 4px 0;
+  }
+
+  .wo-dashboard .user-name {
+    font-size: 0.78rem;
+  }
+
+  .wo-dashboard .content-area {
+    padding: 16px;
+  }
+}
