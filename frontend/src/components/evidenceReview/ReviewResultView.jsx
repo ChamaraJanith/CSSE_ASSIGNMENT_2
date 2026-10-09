@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, ArrowLeft, ArrowUpRight, Siren, Link2, Info, X } from 'lucide-react';
+import { Check, ArrowLeft, ExternalLink, Siren, Link2, Info, X } from 'lucide-react';
 import ReviewStatusBadge from './ReviewStatusBadge';
 import {
   CLASSIFICATIONS, REVIEW_STATUSES, formatDateTime, formatLocation, formatThreatAlertId, formatValue,
@@ -85,9 +85,13 @@ export default function ReviewResultView({ result, evidence, onBackToQueue }) {
 
   return (
     <div className="panel-card er-panel er-result">
+      <div className="panel-header">
+        <h2 className="panel-title er-page-title">Review Result</h2>
+      </div>
+
       <div className="er-result-banner" role="status" aria-label="Review result">
         <span className="er-result-icon">
-          <CheckCircle2 size={52} aria-hidden="true" />
+          <Check size={34} strokeWidth={3} aria-hidden="true" />
         </span>
         <h2>Review Completed</h2>
         <ReviewStatusBadge status={result.reviewStatus} />
@@ -135,12 +139,12 @@ export default function ReviewResultView({ result, evidence, onBackToQueue }) {
         {alert && (
           <button
             type="button"
-            className="btn-tactical btn-tactical-danger"
+            className="btn-tactical btn-tactical-primary"
             onClick={() => setShowAlert(true)}
             aria-expanded={showAlert}
             aria-controls={showAlert ? ALERT_DETAILS_ID : undefined}
           >
-            View Alert <ArrowUpRight size={16} aria-hidden="true" />
+            View Alert <ExternalLink size={16} aria-hidden="true" />
           </button>
         )}
       </div>

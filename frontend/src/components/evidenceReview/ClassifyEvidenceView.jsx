@@ -155,7 +155,7 @@ export default function ClassifyEvidenceView({
   return (
     <div className="panel-card er-panel er-classify">
       <div className="panel-header">
-        <div className="panel-title">{evidence.isReviewable ? 'Classify Evidence' : 'Evidence Details'}</div>
+        <h2 className="panel-title er-page-title">{evidence.isReviewable ? 'Classify Evidence' : 'Evidence Details'}</h2>
         <button type="button" className="btn-tactical btn-tactical-secondary" onClick={onBackToQueue}>
           <ArrowLeft size={16} /> Back to Review Queue
         </button>

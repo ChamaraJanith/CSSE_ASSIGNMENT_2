@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, ShieldAlert, Siren } from 'lucide-react';
+import { AlertTriangle, Lock, ShieldAlert, Siren } from 'lucide-react';
 import EvidenceImage from './EvidenceImage';
 import { MetadataWarning } from './ClassifyEvidenceView';
 import {
@@ -19,11 +19,12 @@ function RequiredMark() {
 }
 
 // Read-only field styled like the wireframe's selected value; the value cannot be changed here
-function FixedField({ id, label, value, valueClassName }) {
+function FixedField({ id, label, value, valueClassName, icon: Icon }) {
   return (
     <div className="er-field er-fixed-field">
       <label htmlFor={id}>{label} <RequiredMark /></label>
-      <div className="er-fixed-input">
+      <div className={Icon ? 'er-fixed-input er-fixed-input-with-icon' : 'er-fixed-input'}>
+        {Icon && <Icon size={16} className="er-fixed-leading-icon" aria-hidden="true" />}
         <input id={id} type="text" value={value} readOnly className={valueClassName} />
         <Lock size={14} className="er-fixed-icon" aria-hidden="true" />
       </div>
@@ -41,27 +42,29 @@ function EscalationSummary({ evidence, onImageStatusChange, onBackToQueue }) {
   ];
 
   return (
-    <section className="er-evidence-card er-escalate-card" aria-labelledby="er-escalate-summary-title">
+    <section className="er-evidence-card er-escalate-card er-escalate-summary" aria-labelledby="er-escalate-summary-title">
       <h3 id="er-escalate-summary-title" className="er-section-title">Evidence Summary</h3>
-      <EvidenceImage
-        key={evidence.id}
-        src={evidence.imageUrl}
-        alt={`Camera-trap evidence ${evidence.imageCode}`}
-        onStatusChange={onImageStatusChange}
-        onBackToQueue={onBackToQueue}
-      />
-      <dl className="er-summary">
-        {rows.map(([label, value]) => (
-          <div key={label} className="er-summary-row">
-            <dt>{label}</dt>
-            <dd>{value}</dd>
+      <div className="er-escalate-summary-body">
+        <EvidenceImage
+          key={evidence.id}
+          src={evidence.imageUrl}
+          alt={`Camera-trap evidence ${evidence.imageCode}`}
+          onStatusChange={onImageStatusChange}
+          onBackToQueue={onBackToQueue}
+        />
+        <dl className="er-summary">
+          {rows.map(([label, value]) => (
+            <div key={label} className="er-summary-row">
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+          <div className="er-summary-row">
+            <dt>Classification</dt>
+            <dd><span className="er-classification-tag">{getClassificationLabel(CLASSIFICATIONS.SUSPICIOUS_PERSON)}</span></dd>
           </div>
-        ))}
-        <div className="er-summary-row">
-          <dt>Classification</dt>
-          <dd><span className="er-classification-tag">{getClassificationLabel(CLASSIFICATIONS.SUSPICIOUS_PERSON)}</span></dd>
-        </div>
-      </dl>
+        </dl>
+      </div>
     </section>
   );
 }
@@ -79,11 +82,11 @@ export default function EscalateEvidenceView({
   return (
     <div className="panel-card er-panel er-escalate">
       <div className="panel-header">
-        <h2 className="panel-title er-page-title"><Siren size={20} /> Escalate Suspicious Evidence</h2>
+        <h2 className="panel-title er-page-title">Escalate Suspicious Evidence</h2>
       </div>
 
       <div className="er-danger-banner" role="note" aria-label="Escalation warning">
-        <ShieldAlert size={22} className="er-danger-banner-icon" aria-hidden="true" />
+        <AlertTriangle size={22} className="er-danger-banner-icon" aria-hidden="true" />
         <div>
           <strong>You are escalating this evidence.</strong>
           <span> Please confirm the details before creating a threat alert.</span>
@@ -101,9 +104,15 @@ export default function EscalateEvidenceView({
         <div className="er-escalate-grid">
           <EscalationSummary evidence={evidence} onImageStatusChange={onImageStatusChange} onBackToQueue={onBackToQueue} />
 
-          <section className="er-evidence-card er-escalate-card" aria-labelledby="er-escalate-details-title">
+          <section className="er-evidence-card er-escalate-card er-escalate-details" aria-labelledby="er-escalate-details-title">
             <h3 id="er-escalate-details-title" className="er-section-title">Threat / Escalation Details</h3>
-            <FixedField id="er-threat-priority" label="Threat Priority" value={THREAT_PRIORITY} valueClassName="er-priority-high" />
+            <FixedField
+              id="er-threat-priority"
+              label="Threat Priority"
+              value={THREAT_PRIORITY}
+              valueClassName="er-priority-high"
+              icon={ShieldAlert}
+            />
             <FixedField id="er-recipient-team" label="Recipient / Team" value={RECIPIENT_TEAM} />
 
             {needsAcknowledgement && (
