@@ -46,10 +46,9 @@ export default function TacticalMap({ route, park, riskZones = [], rangers = [],
         maxZoom: 18
       });
     } else {
-      // CartoDB Dark Matter / Tactical Grid
-      tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 18,
-        subdomains: 'abcd'
+      // Esri World Dark Gray Canvas (Tactical Dark - No API key required)
+      tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 16
       });
     }
     tileLayer.addTo(map);
@@ -77,6 +76,7 @@ export default function TacticalMap({ route, park, riskZones = [], rangers = [],
       dashArray: '6, 6'
     }).addTo(map);
 
+
     threatCircle.bindPopup(`
       <div style="font-family: Inter, sans-serif; color: #020806; font-size: 12px; padding: 4px;">
         <strong style="color: #dc2626;">⚠️ CRITICAL THREAT HOTSPOT</strong><br/>
@@ -85,6 +85,32 @@ export default function TacticalMap({ route, park, riskZones = [], rangers = [],
         Coordinates: 06°25'40"N, 81°32'42"E
       </div>
     `);
+
+
+    //
+    // if (selectedRanger) {
+    //   const rangerLat = selectedRanger.current_lat || 6.4010;
+    //   const rangerLng = selectedRanger.current_lng || 81.5050;
+
+    //   const rangerHtml = `
+    //     <div style="
+    //       padding: 4px 8px;
+    //       background: #022c22;
+    //       border: 1px solid #10b981;
+    //       border-radius: 6px;
+    //       color: #34d399;
+    //       font-size: 10px;
+    //       font-weight: 700;
+    //       white-space: nowrap;
+    //       box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+    //       display: flex;
+    //       align-items: center;
+    //       gap: 4px;
+    //     ">
+    //       <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; display: inline-block;"></span>
+    //       ${selectedRanger.full_name}
+    //     </div>
+
 
     // 5. Custom Waypoint Marker Icons
     checkpoints.forEach((wp, idx) => {
@@ -108,6 +134,7 @@ export default function TacticalMap({ route, park, riskZones = [], rangers = [],
         </div>
       `;
 
+
       const customIcon = L.divIcon({
         className: 'custom-wp-pin',
         html: markerHtml,
@@ -124,6 +151,7 @@ export default function TacticalMap({ route, park, riskZones = [], rangers = [],
         </div>
       `);
     });
+
 
     // 6. Draw Selected Ranger Live Location Pin (if provided)
     if (selectedRanger) {
@@ -199,6 +227,7 @@ export default function TacticalMap({ route, park, riskZones = [], rangers = [],
         zIndex: 500,
         backdropFilter: 'blur(8px)'
       }}>
+
         <Navigation size={13} color="#34d399" />
         <span style={{ color: '#fff', fontWeight: 700 }}>{route?.route_name || park?.name || 'Tactical Overview'}</span>
         <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
