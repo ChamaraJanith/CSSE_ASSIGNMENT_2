@@ -395,6 +395,17 @@
 }
 
 @media (max-width: 640px) {
+  /* Narrow screens: tighter tab padding so all three tabs stay inside the card */
+  .er-tabs {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .er-tab {
+    flex: 1 1 auto;
+    padding: 8px 6px;
+  }
+
   .er-toolbar {
     justify-content: stretch;
   }
