@@ -7,7 +7,7 @@ const {
 } = monitoringRuleConfig;
 
 // Option values are read from the config so these tests keep working when the
-// UNCONFIRMED hazard / response placeholders are replaced with the Assignment 02 values.
+// UNCONFIRMED hazard placeholders are replaced with the Assignment 02 values.
 const HAZARD = HAZARD_TYPES[0].value;
 const RESPONSE = RESPONSE_BEHAVIOURS[0].value;
 const OTHER_HAZARD = 'ANOTHER_HAZARD';
@@ -202,6 +202,21 @@ describe('UC04: Configure Park-Specific Wildlife Monitoring Rules - Business Rul
   });
 
   describe('validateFields: configured options', () => {
+    test('[POSITIVE CASE] the response behaviours are exactly the four project-defined options', () => {
+      expect(RESPONSE_BEHAVIOURS).toEqual([
+        { value: 'NOTIFY_RECIPIENTS', label: 'Notify Recipients' },
+        { value: 'CREATE_INCIDENT', label: 'Create Incident' },
+        { value: 'NOTIFY_AND_CREATE_INCIDENT', label: 'Notify & Create Incident' },
+        { value: 'NOTIFY_AND_ESCALATE', label: 'Notify & Escalate' }
+      ]);
+      expect(Object.isFrozen(RESPONSE_BEHAVIOURS)).toBe(true);
+    });
+
+    test('[NEGATIVE CASE] the retired PLACEHOLDER_RESPONSE code should no longer be accepted', () => {
+      const error = expectFieldError(validInput({ responseBehaviour: 'PLACEHOLDER_RESPONSE' }), 'responseBehaviour', ERROR_CODES.INVALID_VALUE);
+      expect(error.message).toMatch(/NOTIFY_RECIPIENTS, CREATE_INCIDENT, NOTIFY_AND_CREATE_INCIDENT, NOTIFY_AND_ESCALATE/);
+    });
+
     test.each([
       ['hazardType', 'NOT_A_HAZARD'],
       ['alertPriority', 'URGENT'],

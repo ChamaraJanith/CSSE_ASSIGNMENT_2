@@ -1,8 +1,8 @@
 import { describe, test, expect } from 'vitest';
 import {
-  EMPTY_RULE_FORM, FORM_STEPS, LAST_STEP, LIST_TABS, NOT_RECORDED, REVIEW_STEP, RULE_ROW_ACTIONS, TOTAL_STEPS,
-  buildRulePayload, countByTab, describeApiError, describeRuleError, filterByTab, findZone, firstStepWithError,
-  formatRecipients, formatZone, getFieldLabel, getOptionLabel, getRuleActions, getRuleZoneLabel, getStatusLabel,
+  EMPTY_RULE_FORM, FORM_STEPS, LAST_STEP, LIST_TABS, NOT_RECORDED, NO_RESPONSE_BEHAVIOUR, REVIEW_STEP, RULE_ROW_ACTIONS,
+  TOTAL_STEPS, buildRulePayload, countByTab, describeApiError, describeRuleError, filterByTab, findZone, firstStepWithError,
+  formatRecipients, formatResponseBehaviour, formatZone, getFieldLabel, getOptionLabel, getRuleActions, getRuleZoneLabel, getStatusLabel,
   groupErrorsByField, isStepComplete, orderPriorityOptions, toRuleForm, toZoneCircle, toggleRecipient,
 } from '../monitoringRuleUtils';
 import { EXISTING_RULES, OPTIONS, RISK_ZONES, RULES_ALL_STATUSES, WILPATTU_ZONES } from './fixtures';
@@ -45,7 +45,7 @@ describe('monitoringRuleUtils - payload', () => {
   test('builds the API payload with numeric ids and only the seven rule fields', () => {
     const form = {
       hazardType: 'POACHING_SNARING', riskZoneId: 2, alertPriority: 'MEDIUM',
-      notificationRecipients: ['wildlife_officer'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: ' n ',
+      notificationRecipients: ['wildlife_officer'], responseBehaviour: 'NOTIFY_RECIPIENTS', notes: ' n ',
     };
     const payload = buildRulePayload(form, 1);
     expect(payload).toEqual({ parkId: 1, ...form });
@@ -93,6 +93,18 @@ describe('monitoringRuleUtils - display helpers', () => {
     expect(formatRecipients(OPTIONS.recipientRoles, [])).toBe(NOT_RECORDED);
   });
 
+  test('response behaviours show their label; a retired or missing value displays safely', () => {
+    expect(formatResponseBehaviour(OPTIONS.responseBehaviours, 'NOTIFY_RECIPIENTS')).toBe('Notify Recipients');
+    expect(formatResponseBehaviour(OPTIONS.responseBehaviours, 'CREATE_INCIDENT')).toBe('Create Incident');
+    expect(formatResponseBehaviour(OPTIONS.responseBehaviours, 'NOTIFY_AND_CREATE_INCIDENT')).toBe('Notify & Create Incident');
+    expect(formatResponseBehaviour(OPTIONS.responseBehaviours, 'NOTIFY_AND_ESCALATE')).toBe('Notify & Escalate');
+    expect(formatResponseBehaviour(OPTIONS.responseBehaviours, 'PLACEHOLDER_RESPONSE')).toBe(NO_RESPONSE_BEHAVIOUR);
+    expect(formatResponseBehaviour(OPTIONS.responseBehaviours, null)).toBe(NOT_RECORDED);
+    expect(formatResponseBehaviour(OPTIONS.responseBehaviours, '')).toBe(NOT_RECORDED);
+    // Before the options load, the stored code is shown rather than guessed
+    expect(formatResponseBehaviour(null, 'NOTIFY_RECIPIENTS')).toBe('NOTIFY_RECIPIENTS');
+  });
+
   test('risk zones are shown as code and name, from the joined zone or the reference zones', () => {
     expect(formatZone(RISK_ZONES[1])).toBe('RZ-YALA-02 – Katagamuwa Sanctuary Boundary');
     expect(formatZone(null)).toBe(NOT_RECORDED);
@@ -128,16 +140,21 @@ describe('monitoringRuleUtils - display helpers', () => {
       riskZoneId: 2,
       alertPriority: 'LOW',
       notificationRecipients: ['community_liaison_officer'],
-      responseBehaviour: 'PLACEHOLDER_RESPONSE',
+      responseBehaviour: 'NOTIFY_RECIPIENTS',
       notes: 'Seasonal',
     });
     expect(toRuleForm(draft).notificationRecipients).not.toBe(draft.notificationRecipients);
     expect(toRuleForm({ ...draft, notes: null }).notes).toBe('');
     expect(toRuleForm(null)).toEqual(EMPTY_RULE_FORM);
+    // With the options, a current response behaviour is kept and a retired one is cleared
+    expect(toRuleForm({ ...draft, responseBehaviour: 'NOTIFY_AND_ESCALATE' }, OPTIONS).responseBehaviour).toBe('NOTIFY_AND_ESCALATE');
+    expect(toRuleForm({ ...draft, responseBehaviour: 'PLACEHOLDER_RESPONSE' }, OPTIONS).responseBehaviour).toBe('');
+    expect(toRuleForm({ ...draft, responseBehaviour: null }, OPTIONS).responseBehaviour).toBe('');
+    expect(toRuleForm({ ...draft, responseBehaviour: 'PLACEHOLDER_RESPONSE' }).responseBehaviour).toBe('PLACEHOLDER_RESPONSE');
     // Round trip: the edited form produces the same payload the rule was saved with
     expect(buildRulePayload(toRuleForm(draft), 1)).toEqual({
       parkId: 1, hazardType: draft.hazardType, riskZoneId: 2, alertPriority: 'LOW',
-      notificationRecipients: ['community_liaison_officer'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: 'Seasonal',
+      notificationRecipients: ['community_liaison_officer'], responseBehaviour: 'NOTIFY_RECIPIENTS', notes: 'Seasonal',
     });
   });
 

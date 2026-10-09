@@ -72,7 +72,7 @@ const completeStep2 = async (user, {
 } = {}) => {
   if (priority) await user.click(screen.getByRole('radio', { name: priority }));
   for (const recipient of recipients) await user.click(screen.getByRole('checkbox', { name: recipient }));
-  if (response) await user.selectOptions(screen.getByLabelText(/Response Behaviour/), 'PLACEHOLDER_RESPONSE');
+  if (response) await user.selectOptions(screen.getByLabelText(/Response Behaviour/), 'NOTIFY_RECIPIENTS');
   if (notes) await user.type(screen.getByLabelText(/Additional Notes/), notes);
 };
 
@@ -90,7 +90,7 @@ const ruleInformation = () => screen.getByRole('region', { name: 'Rule Informati
 // What the backend returns from /validate for the default happy-path configuration
 const VALIDATED_RULE = validResult({
   parkId: 1, hazardType: 'POACHING_SNARING', riskZoneId: 2, alertPriority: 'HIGH',
-  notificationRecipients: ['wildlife_officer', 'park_manager'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: '',
+  notificationRecipients: ['wildlife_officer', 'park_manager'], responseBehaviour: 'NOTIFY_RECIPIENTS', notes: '',
 }).data.rule;
 
 beforeEach(() => {
@@ -122,6 +122,7 @@ describe('MonitoringRulesManager - rules list and selected park', () => {
     expect(rows[1]).toHaveTextContent('Poaching & Snaring');
     expect(rows[1]).toHaveTextContent('RZ-YALA-01 – Northern River Basin Buffer');
     expect(rows[1]).toHaveTextContent('Park Manager, Wildlife Officer');
+    expect(rows[1]).toHaveTextContent('Notify Recipients');
     expect(rows[1]).toHaveTextContent('Active');
     expect(rows[2]).toHaveTextContent('Elephant Crop Raiding & Fence Breaches');
     expect(rows[2]).toHaveTextContent('Draft');
@@ -379,14 +380,22 @@ describe('MonitoringRulesManager - Step 2: Priority & Notifications', () => {
     );
   });
 
-  test('response behaviour offers the backend option and notes can be entered', async () => {
+  test('response behaviour is a select of the four backend options and notes can be entered', async () => {
     const user = await openStep2();
     const response = screen.getByLabelText(/Response Behaviour/);
-    expect(within(response).getAllByRole('option').map((option) => option.value)).toEqual(['', 'PLACEHOLDER_RESPONSE']);
+    expect(response.tagName).toBe('SELECT');
+    expect(response).toHaveValue('');
+    expect(within(response).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Select response behaviour', 'Notify Recipients', 'Create Incident', 'Notify & Create Incident', 'Notify & Escalate',
+    ]);
+    expect(within(response).getAllByRole('option').map((option) => option.value)).toEqual([
+      '', 'NOTIFY_RECIPIENTS', 'CREATE_INCIDENT', 'NOTIFY_AND_CREATE_INCIDENT', 'NOTIFY_AND_ESCALATE',
+    ]);
+    expect(screen.queryByText(/to be confirmed/)).toBeNull();
 
-    await user.selectOptions(response, 'PLACEHOLDER_RESPONSE');
+    await user.selectOptions(response, 'NOTIFY_AND_ESCALATE');
     await user.type(screen.getByLabelText(/Additional Notes/), 'Night patrol focus');
-    expect(response).toHaveValue('PLACEHOLDER_RESPONSE');
+    expect(response).toHaveValue('NOTIFY_AND_ESCALATE');
     expect(screen.getByLabelText(/Additional Notes/)).toHaveValue('Night patrol focus');
   });
 
@@ -403,7 +412,7 @@ describe('MonitoringRulesManager - Step 2: Priority & Notifications', () => {
     expect(screen.getByRole('radio', { name: 'High' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Wildlife Officer' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Park Manager' })).toBeChecked();
-    expect(screen.getByLabelText(/Response Behaviour/)).toHaveValue('PLACEHOLDER_RESPONSE');
+    expect(screen.getByLabelText(/Response Behaviour/)).toHaveValue('NOTIFY_RECIPIENTS');
     expect(screen.getByLabelText(/Additional Notes/)).toHaveValue('Night patrol focus');
   });
 
@@ -419,7 +428,7 @@ describe('MonitoringRulesManager - Step 2: Priority & Notifications', () => {
       riskZoneId: 2,
       alertPriority: 'HIGH',
       notificationRecipients: ['wildlife_officer', 'park_manager'],
-      responseBehaviour: 'PLACEHOLDER_RESPONSE',
+      responseBehaviour: 'NOTIFY_RECIPIENTS',
       notes: '  Night patrol focus ',
     });
     expect(apiService.createMonitoringRule).not.toHaveBeenCalled();
@@ -458,7 +467,7 @@ describe('MonitoringRulesManager - Step 3: Review', () => {
     expect(valueOf(details, 'Risk Zone')).toBe('RZ-YALA-02 – Katagamuwa Sanctuary Boundary');
     expect(valueOf(details, 'Alert Priority')).toBe('High');
     expect(valueOf(details, 'Notification Recipients')).toBe('Park Manager, Wildlife Officer');
-    expect(valueOf(details, 'Response Behaviour')).toBe('Response behaviour (to be confirmed)');
+    expect(valueOf(details, 'Response Behaviour')).toBe('Notify Recipients');
     expect(valueOf(details, 'Notes')).toBe('Night patrol focus');
     expect(screen.queryByText('Rule ID')).toBeNull();
     expect(apiService.createMonitoringRule).not.toHaveBeenCalled();
@@ -644,7 +653,7 @@ describe('MonitoringRulesManager - Result / Confirmation', () => {
     expect(valueOf(info, 'Risk Zone')).toBe('RZ-YALA-02 – Katagamuwa Sanctuary Boundary');
     expect(valueOf(info, 'Alert Priority')).toBe('High');
     expect(valueOf(info, 'Notification Recipients')).toBe('Park Manager, Wildlife Officer');
-    expect(valueOf(info, 'Response Behaviour')).toBe('Response behaviour (to be confirmed)');
+    expect(valueOf(info, 'Response Behaviour')).toBe('Notify Recipients');
     expect(valueOf(info, 'Notes')).toBe('Night patrol focus');
     expect(screen.getAllByText('Rule ID')).toHaveLength(1);
   });
@@ -705,7 +714,7 @@ describe('MonitoringRulesManager - main UC04 flow', () => {
 
     await user.click(await screen.findByRole('radio', { name: 'Critical' }));
     await user.click(screen.getByRole('checkbox', { name: 'Wildlife Officer' }));
-    await user.selectOptions(screen.getByLabelText(/Response Behaviour/), 'PLACEHOLDER_RESPONSE');
+    await user.selectOptions(screen.getByLabelText(/Response Behaviour/), 'NOTIFY_RECIPIENTS');
     await user.type(screen.getByLabelText(/Additional Notes/), ' Fence repair pending ');
     await user.click(submitButton());
 
@@ -715,7 +724,7 @@ describe('MonitoringRulesManager - main UC04 flow', () => {
       riskZoneId: 2,
       alertPriority: 'CRITICAL',
       notificationRecipients: ['wildlife_officer'],
-      responseBehaviour: 'PLACEHOLDER_RESPONSE',
+      responseBehaviour: 'NOTIFY_RECIPIENTS',
     };
     expect(apiService.validateMonitoringRule).toHaveBeenCalledWith({ ...expectedPayload, notes: ' Fence repair pending ' });
 
@@ -845,7 +854,7 @@ describe('MonitoringRulesManager - View Details', () => {
     expect(within(dialog).getByText('CRITICAL', { selector: '.badge-risk' })).toHaveClass('critical');
     expect(valueOf(dialog, 'Alert Priority')).toBe('Critical');
     expect(valueOf(dialog, 'Notification Recipients')).toBe('Park Manager, Wildlife Officer');
-    expect(valueOf(dialog, 'Response Behaviour')).toBe('Response behaviour (to be confirmed)');
+    expect(valueOf(dialog, 'Response Behaviour')).toBe('Notify Recipients');
     expect(valueOf(dialog, 'Status')).toBe('Active');
     expect(valueOf(dialog, 'Created')).toBe('08 Oct 2026, 07:30');
     expect(valueOf(dialog, 'Updated')).toBe('08 Oct 2026, 07:30');
@@ -870,6 +879,36 @@ describe('MonitoringRulesManager - View Details', () => {
     expect(valueOf(dialog, 'Hazard / Species')).toBe('Illegal Fishing & Campsites');
     expect(valueOf(dialog, 'Updated')).toBe('09 Oct 2026, 09:45');
     expect(within(dialog).queryByText('Activated', { selector: 'dt' })).toBeNull();
+  });
+
+  test('each response behaviour is shown by its label in the list and the details', async () => {
+    const rules = OPTIONS.responseBehaviours.map(({ value }, index) => ({ ...EXISTING_RULES[0], id: 20 + index, responseBehaviour: value }));
+    const user = await renderWithRules(rules);
+
+    for (const [index, { label }] of OPTIONS.responseBehaviours.entries()) {
+      expect(rowOf(20 + index)).toHaveTextContent(label);
+      await openDetails(user, 20 + index);
+      expect(valueOf(detailsDialog(20 + index), 'Response Behaviour')).toBe(label);
+      await user.keyboard('{Escape}');
+    }
+  });
+
+  test('a rule saved with a retired or missing response behaviour still displays safely', async () => {
+    const rules = [
+      { ...EXISTING_RULES[0], responseBehaviour: 'PLACEHOLDER_RESPONSE' },
+      { ...EXISTING_RULES[1], responseBehaviour: null },
+    ];
+    const user = await renderWithRules(rules);
+
+    expect(rowOf(12)).toHaveTextContent('Not selected');
+    expect(rowOf(12)).not.toHaveTextContent('PLACEHOLDER_RESPONSE');
+    expect(rowOf(11)).toHaveTextContent('Not recorded');
+
+    await openDetails(user, 12);
+    expect(valueOf(detailsDialog(12), 'Response Behaviour')).toBe('Not selected');
+    await user.keyboard('{Escape}');
+    await openDetails(user, 11);
+    expect(valueOf(detailsDialog(11), 'Response Behaviour')).toBe('Not recorded');
   });
 });
 
@@ -970,6 +1009,7 @@ describe('MonitoringRulesManager - Activate / Deactivate', () => {
     // The refreshed rule now offers Deactivate in its details
     await openDetails(user, 11);
     expect(valueOf(detailsDialog(11), 'Status')).toBe('Active');
+    expect(valueOf(detailsDialog(11), 'Response Behaviour')).toBe('Notify Recipients');
     expect(dialogActionsOf(11)).toEqual(['Deactivate']);
   });
 
@@ -989,6 +1029,7 @@ describe('MonitoringRulesManager - Activate / Deactivate', () => {
 
     await openDetails(user, 12);
     expect(valueOf(detailsDialog(12), 'Status')).toBe('Inactive');
+    expect(valueOf(detailsDialog(12), 'Response Behaviour')).toBe('Notify Recipients');
     expect(within(detailsDialog(12)).queryByText('Activated', { selector: 'dt' })).toBeNull();
     expect(dialogActionsOf(12)).toEqual([]);
   });
@@ -1100,7 +1141,7 @@ describe('MonitoringRulesManager - Draft Edit', () => {
     expect(screen.getByRole('radio', { name: 'Low' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Community Liaison Officer' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Park Manager' })).not.toBeChecked();
-    expect(screen.getByLabelText(/Response Behaviour/)).toHaveValue('PLACEHOLDER_RESPONSE');
+    expect(screen.getByLabelText(/Response Behaviour/)).toHaveValue('NOTIFY_RECIPIENTS');
     expect(screen.getByLabelText(/Additional Notes/)).toHaveValue('Seasonal');
   });
 
@@ -1117,7 +1158,7 @@ describe('MonitoringRulesManager - Draft Edit', () => {
 
     const expectedPayload = {
       parkId: 1, hazardType: DRAFT.hazardType, riskZoneId: 2, alertPriority: 'CRITICAL',
-      notificationRecipients: ['community_liaison_officer'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: 'Seasonal',
+      notificationRecipients: ['community_liaison_officer'], responseBehaviour: 'NOTIFY_RECIPIENTS', notes: 'Seasonal',
     };
     expect(apiService.validateMonitoringRule).toHaveBeenCalledWith(expectedPayload, 11);
 
@@ -1138,6 +1179,57 @@ describe('MonitoringRulesManager - Draft Edit', () => {
     expect(screen.getByText('Rule Status').parentElement).toHaveTextContent('Draft');
     expect(valueOf(document.body, 'Updated')).toBe('09 Oct 2026, 09:45');
     await waitFor(() => expect(apiService.getMonitoringRules).toHaveBeenCalledTimes(2));
+  });
+
+  test('the response behaviour of a draft can be changed and is shown on Review and saved', async () => {
+    apiService.updateMonitoringRule.mockImplementation(async (id, rule) => ({
+      message: 'Draft monitoring rule updated.',
+      data: createdRule(rule, 'DRAFT', { id, updatedAt: UPDATED_AT }),
+    }));
+    const user = await startEdit();
+
+    await user.click(nextButton());
+    await user.selectOptions(screen.getByLabelText(/Response Behaviour/), 'NOTIFY_AND_CREATE_INCIDENT');
+    await user.click(submitButton());
+
+    expect(apiService.validateMonitoringRule).toHaveBeenCalledWith(
+      expect.objectContaining({ responseBehaviour: 'NOTIFY_AND_CREATE_INCIDENT' }), 11,
+    );
+    await screen.findByText('Step 3 of 3');
+    expect(valueOf(ruleDetails(), 'Response Behaviour')).toBe('Notify & Create Incident');
+
+    await user.click(screen.getByRole('button', { name: 'Save Draft Changes' }));
+    expect(apiService.updateMonitoringRule).toHaveBeenCalledWith(11, expect.objectContaining({
+      responseBehaviour: 'NOTIFY_AND_CREATE_INCIDENT',
+    }));
+    expect(await screen.findByText('Draft Monitoring Rule Updated')).toBeInTheDocument();
+    expect(valueOf(ruleInformation(), 'Response Behaviour')).toBe('Notify & Create Incident');
+  });
+
+  test('editing a draft saved with a retired response behaviour asks for a current one', async () => {
+    const user = await renderWithRules([{ ...DRAFT, responseBehaviour: 'PLACEHOLDER_RESPONSE' }]);
+    await clickAction(user, 11, 'Edit');
+    await screen.findByText('Step 1 of 3');
+    await user.click(nextButton());
+
+    const response = screen.getByLabelText(/Response Behaviour/);
+    expect(response).toHaveValue('');
+
+    apiService.validateMonitoringRule.mockResolvedValueOnce(invalidResult({
+      errors: [{ field: 'responseBehaviour', code: 'REQUIRED', message: 'Response behaviour is required.' }],
+    }));
+    await user.click(submitButton());
+    expect(apiService.validateMonitoringRule).toHaveBeenCalledWith(expect.objectContaining({ responseBehaviour: '' }), 11);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Response Behaviour: Response behaviour is required.');
+    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
+
+    await user.selectOptions(response, 'CREATE_INCIDENT');
+    await user.click(submitButton());
+    expect(apiService.validateMonitoringRule).toHaveBeenLastCalledWith(
+      expect.objectContaining({ responseBehaviour: 'CREATE_INCIDENT' }), 11,
+    );
+    await screen.findByText('Step 3 of 3');
+    expect(valueOf(ruleDetails(), 'Response Behaviour')).toBe('Create Incident');
   });
 
   test('saving is locked while pending', async () => {

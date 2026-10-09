@@ -3,7 +3,8 @@ import { ArrowLeft, CheckCircle2, Pencil, Save } from 'lucide-react';
 import RiskZoneMap from './RiskZoneMap';
 import RuleStepper from './RuleStepper';
 import {
-  NOT_RECORDED, REVIEW_STEP, RULE_ACTIONS, TOTAL_STEPS, findZone, formatRecipients, formatZone, getOptionLabel,
+  NOT_RECORDED, REVIEW_STEP, RULE_ACTIONS, TOTAL_STEPS, findZone, formatRecipients, formatResponseBehaviour, formatZone,
+  getOptionLabel,
 } from './monitoringRuleUtils';
 
 // The risk zone's severity from the park's reference zones, with the existing .badge-risk styling
@@ -25,7 +26,7 @@ export function RuleSummary({ rule, parkName, riskZones, options, hideEmptyNotes
   rows.push(
     ['Alert Priority', getOptionLabel(options?.alertPriorities, rule.alertPriority)],
     ['Notification Recipients', formatRecipients(options?.recipientRoles, rule.notificationRecipients)],
-    ['Response Behaviour', getOptionLabel(options?.responseBehaviours, rule.responseBehaviour)],
+    ['Response Behaviour', formatResponseBehaviour(options?.responseBehaviours, rule.responseBehaviour)],
   );
   if (rule.notes || !hideEmptyNotes) rows.push(['Notes', rule.notes || NOT_RECORDED]);
 
