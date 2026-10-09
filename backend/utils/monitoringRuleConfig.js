@@ -38,7 +38,7 @@ const RECIPIENT_ROLES = freezeOptions([
   { value: 'community_liaison_officer', label: 'Community Liaison Officer' }
 ]);
 
-// INACTIVE is reserved and is not written by the current UC04 implementation
+// INACTIVE is only reached by deactivating an ACTIVE rule; it is never created and never reactivated
 const RULE_STATUSES = Object.freeze({
   DRAFT: 'DRAFT',
   ACTIVE: 'ACTIVE',

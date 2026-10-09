@@ -9,6 +9,8 @@ const MANAGER_ID = 'cccccccc-0000-0000-0000-000000000004';
 const HAZARD = HAZARD_TYPES[0].value;
 const RESPONSE = RESPONSE_BEHAVIOURS[0].value;
 const CREATED_AT = '2026-10-07T01:00:00+00:00';
+// NOW() of the fake database for UPDATE statements
+const UPDATED_AT = '2026-10-09T03:00:00+00:00';
 
 const yalaPark = { id: 1, code: 'YALA-NP', name: 'Yala National Park (Ruhuna)' };
 const wilpattuPark = { id: 2, code: 'WILP-NP', name: 'Wilpattu National Park' };
@@ -62,8 +64,12 @@ const STEP_LABELS = [
   ['SELECT id, code, name FROM public.parks', 'SELECT_PARK'],
   ['SELECT id, park_id, zone_code, zone_name FROM public.risk_zones', 'SELECT_ZONE'],
   ['SELECT id, park_id, hazard_type', 'SELECT_SCOPE_RULES'],
-  ['INSERT INTO public.monitoring_rules', 'INSERT_RULE']
+  ['INSERT INTO public.monitoring_rules', 'INSERT_RULE'],
+  ['UPDATE public.monitoring_rules SET status', 'UPDATE_STATUS'],
+  ['UPDATE public.monitoring_rules SET hazard_type', 'UPDATE_CONFIGURATION']
 ];
+
+const isRowLock = (sql) => sql.startsWith('SELECT id, park_id, hazard_type') && sql.endsWith('FOR UPDATE');
 
 /**
  * Fake pg pool/client recording every UC04 statement. `state` is live, so a test can change the
@@ -85,6 +91,29 @@ const createRulePgFake = (getPool, { park = yalaPark, zone = zoneRow(), existing
     if (sql.startsWith('SELECT id, code, name FROM public.parks')) return { rows: state.park ? [state.park] : [] };
     if (sql.startsWith('SELECT id, park_id, zone_code, zone_name FROM public.risk_zones')) {
       return { rows: state.zone ? [state.zone] : [] };
+    }
+    // existingRules doubles as the monitoring_rules table for the row lock and the UPDATEs
+    if (isRowLock(sql)) {
+      const row = state.existingRules.find((r) => r.id === params[0]);
+      return { rows: row ? [{ ...row }] : [] };
+    }
+    if (sql.startsWith('UPDATE public.monitoring_rules SET status')) {
+      const [id, status, isActive] = params;
+      const row = state.existingRules.find((r) => r.id === id);
+      if (!row) return { rows: [] };
+      Object.assign(row, { status, activated_at: isActive ? UPDATED_AT : null, updated_at: UPDATED_AT });
+      return { rows: [{ ...row }] };
+    }
+    if (sql.startsWith('UPDATE public.monitoring_rules SET hazard_type')) {
+      const [id, hazardType, riskZoneId, alertPriority, recipientsJson, responseBehaviour, notes] = params;
+      const row = state.existingRules.find((r) => r.id === id);
+      if (!row) return { rows: [] };
+      Object.assign(row, {
+        hazard_type: hazardType, risk_zone_id: riskZoneId, alert_priority: alertPriority,
+        notification_recipients: JSON.parse(recipientsJson), response_behaviour: responseBehaviour, notes,
+        updated_at: UPDATED_AT
+      });
+      return { rows: [{ ...row }] };
     }
     if (sql.startsWith('SELECT id, park_id, hazard_type')) {
       const [parkId, hazardType, riskZoneId, statuses] = params;
@@ -110,7 +139,9 @@ const createRulePgFake = (getPool, { park = yalaPark, zone = zoneRow(), existing
   const pool = { connect: jest.fn().mockResolvedValue(client), query };
   getPool.mockReturnValue(pool);
 
-  const label = (sql) => (STEP_LABELS.find(([prefix]) => sql.startsWith(prefix)) || [null, sql])[1];
+  const label = (sql) => (isRowLock(sql)
+    ? 'LOCK_RULE'
+    : (STEP_LABELS.find(([prefix]) => sql.startsWith(prefix)) || [null, sql])[1]);
   const find = (prefix) => statements.filter((s) => s.sql.startsWith(prefix));
   return { client, pool, state, statements, find, steps: () => statements.map((s) => label(s.sql)) };
 };
@@ -120,6 +151,7 @@ module.exports = {
   HAZARD,
   RESPONSE,
   CREATED_AT,
+  UPDATED_AT,
   yalaPark,
   wilpattuPark,
   zoneRow,

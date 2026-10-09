@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Shield, Plus, RefreshCw, AlertTriangle } from 'lucide-react';
+import React from 'react';
+import { Shield, Plus, RefreshCw, AlertTriangle, CheckCircle2, Eye } from 'lucide-react';
 import RuleStatusBadge from './RuleStatusBadge';
 import {
   LIST_TABS, countByTab, filterByTab, formatDateTime, formatRecipients, getOptionLabel, getRuleZoneLabel,
@@ -9,12 +9,15 @@ const TABS = [
   { id: LIST_TABS.ALL, label: 'All' },
   { id: LIST_TABS.ACTIVE, label: 'Active' },
   { id: LIST_TABS.DRAFT, label: 'Draft' },
+  { id: LIST_TABS.INACTIVE, label: 'Inactive' },
 ];
 
+// The selected tab is owned by the manager so it survives rule actions, reloads and the edit flow.
+// Every row offers View Details only; the status actions live in the details dialog.
 export default function MonitoringRuleList({
-  rules, loading, error, options, riskZones, canCreate, createHint, onRetry, onCreate,
+  rules, loading, error, options, riskZones, canCreate, createHint, activeTab, notice,
+  onTabChange, onRetry, onCreate, onViewDetails,
 }) {
-  const [activeTab, setActiveTab] = useState(LIST_TABS.ALL);
   const counts = countByTab(rules);
   const visibleRules = filterByTab(rules, activeTab);
 
@@ -34,6 +37,12 @@ export default function MonitoringRuleList({
 
       {createHint && <p className="mr-muted">{createHint}</p>}
 
+      {notice && (
+        <div className="mr-notice" role="status" aria-label="Rule update">
+          <CheckCircle2 size={18} /> {notice}
+        </div>
+      )}
+
       <div className="mr-tabs" role="tablist" aria-label="Monitoring rule status tabs">
         {TABS.map((tab) => (
           <button
@@ -42,7 +51,7 @@ export default function MonitoringRuleList({
             role="tab"
             aria-selected={activeTab === tab.id}
             className={`mr-tab ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => onTabChange(tab.id)}
           >
             {tab.label} <span className="mr-tab-count">{counts[tab.id]}</span>
           </button>
@@ -86,6 +95,7 @@ export default function MonitoringRuleList({
                 <th scope="col">Response Behaviour</th>
                 <th scope="col">Status</th>
                 <th scope="col">Created</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -103,6 +113,15 @@ export default function MonitoringRuleList({
                   <td>{getOptionLabel(options?.responseBehaviours, rule.responseBehaviour)}</td>
                   <td><RuleStatusBadge status={rule.status} /></td>
                   <td>{formatDateTime(rule.createdAt)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn-tactical btn-tactical-secondary mr-row-action"
+                      onClick={() => onViewDetails(rule)}
+                    >
+                      <Eye size={14} /> View Details
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

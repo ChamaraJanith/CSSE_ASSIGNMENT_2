@@ -5,8 +5,9 @@ import userEvent from '@testing-library/user-event';
 import MonitoringRulesManager from '../MonitoringRulesManager';
 import { apiService } from '../../../services/api';
 import {
-  EXISTING_RULES, OPTIONS, PARK, REFERENCE, WILPATTU_PARK, WILPATTU_REFERENCE, apiError, createResponse, createdRule,
-  deferred, invalidResult, validResult,
+  EXISTING_RULES, OPTIONS, PARK, REFERENCE, RISK_ZONES, RULES_ALL_STATUSES, UDAWALAWE_PARK, UDAWALAWE_REFERENCE,
+  UDAWALAWE_ZONES, UPDATED_AT, WILPATTU_PARK, WILPATTU_REFERENCE, WILPATTU_ZONES, apiError, createResponse, createdRule,
+  deferred, invalidResult, ruleInZone, validResult,
 } from './fixtures';
 
 vi.mock('../../../services/api', () => ({
@@ -15,6 +16,9 @@ vi.mock('../../../services/api', () => ({
     getMonitoringRules: vi.fn(),
     validateMonitoringRule: vi.fn(),
     createMonitoringRule: vi.fn(),
+    updateMonitoringRule: vi.fn(),
+    activateMonitoringRule: vi.fn(),
+    deactivateMonitoringRule: vi.fn(),
   },
 }));
 
@@ -689,5 +693,476 @@ describe('MonitoringRulesManager - main UC04 flow', () => {
     expect(valueOf(ruleInformation(), 'Alert Priority')).toBe('Critical');
     expect(valueOf(ruleInformation(), 'Notes')).toBe('Fence repair pending');
     await waitFor(() => expect(apiService.getMonitoringRules).toHaveBeenCalledTimes(2));
+  });
+});
+
+// ---------- rule actions (View Details / Edit / Activate / Deactivate) ----------
+
+const rowOf = (id) => screen.getAllByRole('row').find((row) => within(row).queryByText(`#${id}`, { selector: '.mr-code' }));
+const rowButtons = (id) => within(rowOf(id)).getAllByRole('button').map((button) => button.textContent.trim());
+const tab = (name) => screen.getByRole('tab', { name });
+const detailsDialog = (id) => screen.getByRole('dialog', { name: `Monitoring Rule #${id}` });
+
+// Opens a rule's details from its row
+const openDetails = async (user, id) => {
+  await user.click(within(rowOf(id)).getByRole('button', { name: 'View Details' }));
+  return detailsDialog(id);
+};
+
+// The status actions offered inside a rule's details dialog
+const dialogActionsOf = (id) => {
+  const group = within(detailsDialog(id)).queryByRole('group', { name: `Actions for rule #${id}` });
+  return group ? within(group).getAllByRole('button').map((button) => button.textContent.trim()) : [];
+};
+
+// Rule actions are only reachable through View Details
+const clickAction = async (user, id, name) => {
+  const dialog = await openDetails(user, id);
+  await user.click(within(dialog).getByRole('button', { name }));
+};
+
+const renderWithRules = async (rules = RULES_ALL_STATUSES, managerProps = {}) => {
+  apiService.getMonitoringRules.mockResolvedValue({ data: rules });
+  const user = await renderManager(managerProps);
+  await screen.findByText(`#${rules[0].id}`);
+  return user;
+};
+
+// The list as it looks after the backend changed one rule's status
+const withStatus = (id, status) => RULES_ALL_STATUSES.map((rule) => (rule.id === id
+  ? { ...rule, status, activatedAt: status === 'ACTIVE' ? UPDATED_AT : null, updatedAt: UPDATED_AT }
+  : rule));
+
+describe('MonitoringRulesManager - Actions column and dialog actions by status', () => {
+  test('every row, whatever its status, offers View Details only', async () => {
+    await renderWithRules();
+
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+    [12, 11, 9].forEach((id) => expect(rowButtons(id)).toEqual(['View Details']));
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Activate' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Deactivate' })).toBeNull();
+  });
+
+  test.each([
+    [11, 'Draft', ['Edit', 'Activate']],
+    [12, 'Active', ['Deactivate']],
+    [9, 'Inactive', []],
+  ])('the details of rule #%s (%s) offer exactly %j', async (id, _status, expected) => {
+    const user = await renderWithRules();
+    await openDetails(user, id);
+    expect(dialogActionsOf(id)).toEqual(expected);
+  });
+
+  test('an inactive rule explains that no actions are available', async () => {
+    const user = await renderWithRules();
+    const dialog = await openDetails(user, 9);
+    expect(within(dialog).getByText('No actions are available for inactive rules.')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /Activate|Deactivate|Edit/ })).toBeNull();
+  });
+
+  test('the Inactive tab counts and lists deactivated rules', async () => {
+    const user = await renderWithRules();
+
+    expect(tab(/^All/)).toHaveTextContent('3');
+    expect(tab(/^Active/)).toHaveTextContent('1');
+    expect(tab(/^Draft/)).toHaveTextContent('1');
+    expect(tab(/^Inactive/)).toHaveTextContent('1');
+
+    await user.click(tab(/^Inactive/));
+    const rows = screen.getAllByRole('row');
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toHaveTextContent('#9');
+    expect(rows[1]).toHaveTextContent('Inactive');
+  });
+});
+
+describe('MonitoringRulesManager - View Details', () => {
+  test.each([
+    [12, 'Active'],
+    [11, 'Draft'],
+    [9, 'Inactive'],
+  ])('rule #%s (%s) opens its details and closes again', async (id, status) => {
+    const user = await renderWithRules();
+
+    await openDetails(user, id);
+    const dialog = screen.getByRole('dialog', { name: `Monitoring Rule #${id}` });
+    expect(valueOf(dialog, 'Rule ID')).toBe(`#${id}`);
+    expect(valueOf(dialog, 'Status')).toBe(status);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(apiService.activateMonitoringRule).not.toHaveBeenCalled();
+    expect(apiService.deactivateMonitoringRule).not.toHaveBeenCalled();
+  });
+
+  test('an active rule shows every stored field, including its activation time', async () => {
+    const user = await renderWithRules();
+    await openDetails(user, 12);
+    const dialog = screen.getByRole('dialog');
+
+    expect(valueOf(dialog, 'Rule ID')).toBe('#12');
+    expect(valueOf(dialog, 'Park')).toBe(PARK.name);
+    expect(valueOf(dialog, 'Hazard / Species')).toBe('Poaching & Snaring');
+    expect(valueOf(dialog, 'Risk Zone')).toBe('RZ-YALA-01 – Northern River Basin Buffer');
+    expect(valueOf(dialog, 'Severity')).toBe('CRITICAL');
+    expect(within(dialog).getByText('CRITICAL', { selector: '.badge-risk' })).toHaveClass('critical');
+    expect(valueOf(dialog, 'Alert Priority')).toBe('Critical');
+    expect(valueOf(dialog, 'Notification Recipients')).toBe('Park Manager, Wildlife Officer');
+    expect(valueOf(dialog, 'Response Behaviour')).toBe('Response behaviour (to be confirmed)');
+    expect(valueOf(dialog, 'Status')).toBe('Active');
+    expect(valueOf(dialog, 'Created')).toBe('08 Oct 2026, 07:30');
+    expect(valueOf(dialog, 'Updated')).toBe('08 Oct 2026, 07:30');
+    expect(valueOf(dialog, 'Activated')).toBe('08 Oct 2026, 07:30');
+    // No notes were recorded for this rule
+    expect(within(dialog).queryByText('Notes', { selector: 'dt' })).toBeNull();
+  });
+
+  test('a draft shows its notes and no activation time; an inactive rule shows its update time', async () => {
+    const user = await renderWithRules();
+
+    await openDetails(user, 11);
+    let dialog = screen.getByRole('dialog');
+    expect(valueOf(dialog, 'Notes')).toBe('Seasonal');
+    expect(valueOf(dialog, 'Alert Priority')).toBe('Low');
+    expect(within(dialog).queryByText('Activated', { selector: 'dt' })).toBeNull();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await openDetails(user, 9);
+    dialog = screen.getByRole('dialog');
+    expect(valueOf(dialog, 'Hazard / Species')).toBe('Illegal Fishing & Campsites');
+    expect(valueOf(dialog, 'Updated')).toBe('09 Oct 2026, 09:45');
+    expect(within(dialog).queryByText('Activated', { selector: 'dt' })).toBeNull();
+  });
+});
+
+describe('MonitoringRulesManager - View Details risk-zone map', () => {
+  const mapIn = (dialog) => within(dialog).getByTestId('risk-zone-map');
+
+  test.each([
+    ['Yala', PARK, REFERENCE, RISK_ZONES[0], '6.4128,81.5342', '3.2', 'RZ-YALA-01,RZ-YALA-02', 'CRITICAL'],
+    ['Wilpattu', WILPATTU_PARK, WILPATTU_REFERENCE, WILPATTU_ZONES[1], '8.421,80.062', '2.5', 'RZ-WILP-01,RZ-WILP-02', 'HIGH'],
+    ['Udawalawe', UDAWALAWE_PARK, UDAWALAWE_REFERENCE, UDAWALAWE_ZONES[0], '6.442,80.892', '3', 'RZ-UDAW-01,RZ-UDAW-02', 'CRITICAL'],
+  ])('%s: the map shows the rule\'s own stored zone of the selected park', async (_name, park, reference, zone, center, radius, codes, severity) => {
+    apiService.getMonitoringRuleReference.mockResolvedValue({ data: reference });
+    const rule = ruleInZone(park, zone);
+    const user = await renderWithRules([rule], { parkId: park.id, parkName: park.name });
+
+    const dialog = await openDetails(user, rule.id);
+    const map = mapIn(dialog);
+    expect(map).toHaveAttribute('data-zone-id', String(zone.id));
+    expect(map).toHaveAttribute('data-zone-code', zone.zoneCode);
+    expect(map).toHaveAttribute('data-center', center);
+    expect(map).toHaveAttribute('data-radius-km', radius);
+    expect(map).toHaveAttribute('data-zone-codes', codes);
+    expect(map).toHaveAttribute('data-park-name', park.name);
+    expect(valueOf(dialog, 'Severity')).toBe(severity);
+    expect(valueOf(dialog, 'Park')).toBe(park.name);
+    expect(apiService.getMonitoringRuleReference).toHaveBeenCalledWith(park.id);
+    if (park.id !== PARK.id) expect(map.getAttribute('data-zone-codes')).not.toMatch(/YALA/);
+  });
+
+  test('a rule whose zone is not in the park reference data shows a message instead of a guessed map', async () => {
+    const rule = ruleInZone(PARK, { id: 99, zoneCode: 'RZ-OLD-99', zoneName: 'Retired zone' });
+    const user = await renderWithRules([rule]);
+
+    const dialog = await openDetails(user, rule.id);
+    expect(within(dialog).queryByTestId('risk-zone-map')).toBeNull();
+    expect(within(dialog).getByText(/location of this risk zone is not available for Yala National Park/)).toBeInTheDocument();
+    expect(valueOf(dialog, 'Risk Zone')).toBe('RZ-OLD-99 – Retired zone');
+    expect(valueOf(dialog, 'Severity')).toBe('Not recorded');
+  });
+
+  test('the map is mounted with the dialog and removed when it closes', async () => {
+    const user = await renderWithRules();
+
+    const dialog = await openDetails(user, 12);
+    expect(mapIn(dialog)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Close details' }));
+    expect(screen.queryByTestId('risk-zone-map')).toBeNull();
+
+    // Reopening another rule mounts a fresh map for that rule's zone
+    expect(mapIn(await openDetails(user, 11))).toHaveAttribute('data-zone-code', 'RZ-YALA-02');
+  });
+});
+
+describe('MonitoringRulesManager - Activate / Deactivate', () => {
+  test('Cancel returns to the rule details without calling the API', async () => {
+    const user = await renderWithRules();
+
+    await clickAction(user, 11, 'Activate');
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByRole('dialog', { name: /Activate Monitoring Rule/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(detailsDialog(11)).toBeInTheDocument();
+    expect(dialogActionsOf(11)).toEqual(['Edit', 'Activate']);
+    await user.click(within(detailsDialog(11)).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await clickAction(user, 12, 'Deactivate');
+    expect(screen.getByRole('dialog', { name: /Deactivate Monitoring Rule/ })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(detailsDialog(12)).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    expect(apiService.activateMonitoringRule).not.toHaveBeenCalled();
+    expect(apiService.deactivateMonitoringRule).not.toHaveBeenCalled();
+    expect(apiService.getMonitoringRules).toHaveBeenCalledTimes(1);
+  });
+
+  test('confirming Activate activates the draft, reloads the list and updates its actions and counts', async () => {
+    apiService.activateMonitoringRule.mockResolvedValue({ message: 'Monitoring rule activated successfully.', data: {} });
+    const user = await renderWithRules();
+    apiService.getMonitoringRules.mockResolvedValue({ data: withStatus(11, 'ACTIVE') });
+
+    await clickAction(user, 11, 'Activate');
+    const dialog = screen.getByRole('dialog');
+    expect(valueOf(dialog, 'Hazard / Species')).toBe('Elephant Crop Raiding & Fence Breaches');
+    await user.click(within(dialog).getByRole('button', { name: 'Activate Rule' }));
+
+    expect(apiService.activateMonitoringRule).toHaveBeenCalledWith(11);
+    expect(await screen.findByRole('status', { name: 'Rule update' })).toHaveTextContent('Monitoring rule #11 has been activated.');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(tab(/^Active/)).toHaveTextContent('2'));
+    expect(apiService.getMonitoringRules).toHaveBeenCalledTimes(2);
+    expect(apiService.getMonitoringRules).toHaveBeenLastCalledWith(PARK.id);
+    expect(tab(/^Draft/)).toHaveTextContent('0');
+    expect(rowButtons(11)).toEqual(['View Details']);
+
+    // The refreshed rule now offers Deactivate in its details
+    await openDetails(user, 11);
+    expect(valueOf(detailsDialog(11), 'Status')).toBe('Active');
+    expect(dialogActionsOf(11)).toEqual(['Deactivate']);
+  });
+
+  test('confirming Deactivate deactivates the active rule, which then only offers View Details', async () => {
+    apiService.deactivateMonitoringRule.mockResolvedValue({ message: 'Monitoring rule deactivated.', data: {} });
+    const user = await renderWithRules();
+    apiService.getMonitoringRules.mockResolvedValue({ data: withStatus(12, 'INACTIVE') });
+
+    await clickAction(user, 12, 'Deactivate');
+    await user.click(screen.getByRole('button', { name: 'Deactivate Rule' }));
+
+    expect(apiService.deactivateMonitoringRule).toHaveBeenCalledWith(12);
+    expect(apiService.activateMonitoringRule).not.toHaveBeenCalled();
+    expect(await screen.findByRole('status', { name: 'Rule update' })).toHaveTextContent('Monitoring rule #12 has been deactivated.');
+    await waitFor(() => expect(tab(/^Inactive/)).toHaveTextContent('2'));
+    expect(tab(/^Active/)).toHaveTextContent('0');
+
+    await openDetails(user, 12);
+    expect(valueOf(detailsDialog(12), 'Status')).toBe('Inactive');
+    expect(within(detailsDialog(12)).queryByText('Activated', { selector: 'dt' })).toBeNull();
+    expect(dialogActionsOf(12)).toEqual([]);
+  });
+
+  test('the selected tab and park are kept after an action', async () => {
+    apiService.activateMonitoringRule.mockResolvedValue({ data: {} });
+    const user = await renderWithRules();
+    apiService.getMonitoringRules.mockResolvedValue({ data: withStatus(11, 'ACTIVE') });
+
+    await user.click(tab(/^Draft/));
+    await clickAction(user, 11, 'Activate');
+    await user.click(screen.getByRole('button', { name: 'Activate Rule' }));
+
+    expect(await screen.findByText('No monitoring rules match this tab.')).toBeInTheDocument();
+    expect(tab(/^Draft/)).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('status', { name: 'Selected park' })).toHaveTextContent(PARK.name);
+    apiService.getMonitoringRules.mock.calls.forEach((call) => expect(call).toEqual([PARK.id]));
+  });
+
+  test('the confirmation is locked while the request is pending', async () => {
+    const pending = deferred();
+    apiService.deactivateMonitoringRule.mockReturnValue(pending.promise);
+    const user = await renderWithRules();
+
+    await clickAction(user, 12, 'Deactivate');
+    await user.click(screen.getByRole('button', { name: 'Deactivate Rule' }));
+
+    const pendingButton = await screen.findByRole('button', { name: /Deactivating…/ });
+    expect(pendingButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    await user.click(pendingButton);
+    await user.keyboard('{Escape}');
+    // Only the confirmation is open (the details dialog was replaced), so no second action can start
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByRole('dialog', { name: /Deactivate Monitoring Rule/ })).toBeInTheDocument();
+
+    pending.resolve({ data: {} });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(apiService.deactivateMonitoringRule).toHaveBeenCalledTimes(1);
+  });
+
+  test('a 409 conflict keeps the dialog open with the conflicting rule and does not reload', async () => {
+    apiService.activateMonitoringRule.mockRejectedValue(apiError(409, 'The monitoring rule duplicates or conflicts with an existing rule. No changes were saved.', {
+      conflicts: [{ type: 'CONFLICT', ruleId: 12, status: 'ACTIVE', message: 'An ACTIVE rule (#12) with a different configuration already exists for this hazard and risk zone.' }],
+    }));
+    const user = await renderWithRules();
+
+    await clickAction(user, 11, 'Activate');
+    await user.click(screen.getByRole('button', { name: 'Activate Rule' }));
+
+    const alert = await within(screen.getByRole('dialog')).findByRole('alert');
+    expect(alert).toHaveTextContent('The monitoring rule duplicates or conflicts with an existing rule.');
+    expect(alert).toHaveTextContent('Conflict · Rule #12');
+    expect(screen.getByRole('button', { name: 'Activate Rule' })).toBeEnabled();
+    expect(apiService.getMonitoringRules).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('status', { name: 'Rule update' })).toBeNull();
+  });
+
+  test('a stored draft that no longer validates shows the field errors', async () => {
+    apiService.activateMonitoringRule.mockRejectedValue(apiError(400, 'The saved draft no longer passes validation. Edit the draft before activating it. No changes were saved.', {
+      errors: [{ field: 'riskZoneId', code: 'NOT_FOUND', message: 'The selected risk zone was not found.' }],
+    }));
+    const user = await renderWithRules();
+
+    await clickAction(user, 11, 'Activate');
+    await user.click(screen.getByRole('button', { name: 'Activate Rule' }));
+
+    const alert = await within(screen.getByRole('dialog')).findByRole('alert');
+    expect(alert).toHaveTextContent('Edit the draft before activating it.');
+    expect(alert).toHaveTextContent('Risk Zone: The selected risk zone was not found.');
+  });
+
+  test.each([
+    ['a server error', apiError(500, 'An unexpected error occurred while processing the monitoring rule request.'), /An unexpected error occurred/],
+    ['a network failure', new TypeError('Failed to fetch'), /Unable to reach the monitoring rules service/],
+    ['a deleted rule', apiError(404, 'Monitoring rule not found.'), /This monitoring rule no longer exists/],
+    ['a status change by another user', apiError(409, 'Only ACTIVE rules can be deactivated. This rule is INACTIVE. No changes were saved.'), /Only ACTIVE rules can be deactivated/],
+  ])('%s keeps the dialog open with a safe message', async (_label, error, message) => {
+    apiService.deactivateMonitoringRule.mockRejectedValue(error);
+    const user = await renderWithRules();
+
+    await clickAction(user, 12, 'Deactivate');
+    await user.click(screen.getByRole('button', { name: 'Deactivate Rule' }));
+
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(message);
+    expect(screen.getByRole('button', { name: 'Deactivate Rule' })).toBeEnabled();
+    expect(apiService.getMonitoringRules).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MonitoringRulesManager - Draft Edit', () => {
+  const DRAFT = EXISTING_RULES[1];
+
+  const startEdit = async () => {
+    const user = await renderWithRules();
+    await clickAction(user, 11, 'Edit');
+    await screen.findByText('Step 1 of 3');
+    return user;
+  };
+
+  test('Edit opens the configuration flow prefilled with the saved draft', async () => {
+    const user = await startEdit();
+
+    expect(screen.getByText('Edit Draft Monitoring Rule #11')).toBeInTheDocument();
+    expect(hazardSelect()).toHaveValue('ELEPHANT_CROP_RAIDING_FENCE_BREACH');
+    expect(zoneSelect()).toHaveValue('2');
+
+    await user.click(nextButton());
+    expect(screen.getByRole('radio', { name: 'Low' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Community Liaison Officer' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Park Manager' })).not.toBeChecked();
+    expect(screen.getByLabelText(/Response Behaviour/)).toHaveValue('PLACEHOLDER_RESPONSE');
+    expect(screen.getByLabelText(/Additional Notes/)).toHaveValue('Seasonal');
+  });
+
+  test('saving an edited draft revalidates with its ID and updates it in place, never creating a rule', async () => {
+    apiService.updateMonitoringRule.mockImplementation(async (id, rule) => ({
+      message: 'Draft monitoring rule updated.',
+      data: createdRule(rule, 'DRAFT', { id, updatedAt: UPDATED_AT }),
+    }));
+    const user = await startEdit();
+
+    await user.click(nextButton());
+    await user.click(screen.getByRole('radio', { name: 'Critical' }));
+    await user.click(submitButton());
+
+    const expectedPayload = {
+      parkId: 1, hazardType: DRAFT.hazardType, riskZoneId: 2, alertPriority: 'CRITICAL',
+      notificationRecipients: ['community_liaison_officer'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: 'Seasonal',
+    };
+    expect(apiService.validateMonitoringRule).toHaveBeenCalledWith(expectedPayload, 11);
+
+    await screen.findByText('Step 3 of 3');
+    expect(screen.getByText('Edit Draft Monitoring Rule #11')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Activate Rule' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save as Draft' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Save Draft Changes' }));
+    expect(apiService.updateMonitoringRule).toHaveBeenCalledWith(11, expectedPayload);
+    expect(apiService.createMonitoringRule).not.toHaveBeenCalled();
+    expect(apiService.activateMonitoringRule).not.toHaveBeenCalled();
+
+    expect(await screen.findByText('Draft Monitoring Rule Updated')).toBeInTheDocument();
+    expect(screen.getByText('The draft has been updated. It keeps its rule ID and is not active.')).toBeInTheDocument();
+    expect(valueOf(ruleInformation(), 'Rule ID')).toBe('#11');
+    expect(valueOf(ruleInformation(), 'Alert Priority')).toBe('Critical');
+    expect(screen.getByText('Rule Status').parentElement).toHaveTextContent('Draft');
+    expect(valueOf(document.body, 'Updated')).toBe('09 Oct 2026, 09:45');
+    await waitFor(() => expect(apiService.getMonitoringRules).toHaveBeenCalledTimes(2));
+  });
+
+  test('saving is locked while pending', async () => {
+    const pending = deferred();
+    apiService.updateMonitoringRule.mockReturnValue(pending.promise);
+    const user = await startEdit();
+    await user.click(nextButton());
+    await user.click(submitButton());
+    await screen.findByText('Step 3 of 3');
+
+    await user.click(screen.getByRole('button', { name: 'Save Draft Changes' }));
+    expect(await screen.findByRole('button', { name: /Saving…/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Back$/ })).toBeDisabled();
+
+    pending.resolve({ data: createdRule(VALIDATED_RULE, 'DRAFT', { id: 11 }) });
+    expect(await screen.findByText('Draft Monitoring Rule Updated')).toBeInTheDocument();
+    expect(apiService.updateMonitoringRule).toHaveBeenCalledTimes(1);
+  });
+
+  test('a 409 conflict on save returns to the form with the conflict and the edited values', async () => {
+    apiService.updateMonitoringRule.mockRejectedValue(apiError(409, 'The monitoring rule duplicates or conflicts with an existing rule. No changes were saved.', {
+      conflicts: [{ type: 'DUPLICATE', ruleId: 15, status: 'DRAFT', message: 'An identical DRAFT rule (#15) already exists for this hazard and risk zone.' }],
+    }));
+    const user = await startEdit();
+    await user.click(nextButton());
+    await user.click(screen.getByRole('radio', { name: 'High' }));
+    await user.click(submitButton());
+    await screen.findByText('Step 3 of 3');
+
+    await user.click(screen.getByRole('button', { name: 'Save Draft Changes' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Duplicate · Rule #15');
+    expect(screen.getByText('Edit Draft Monitoring Rule #11')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'High' })).toBeChecked();
+    expect(apiService.createMonitoringRule).not.toHaveBeenCalled();
+  });
+
+  test('a deleted draft (404) keeps the user on Review with a rule-specific message', async () => {
+    apiService.updateMonitoringRule.mockRejectedValue(apiError(404, 'Monitoring rule not found.'));
+    const user = await startEdit();
+    await user.click(nextButton());
+    await user.click(submitButton());
+    await screen.findByText('Step 3 of 3');
+
+    await user.click(screen.getByRole('button', { name: 'Save Draft Changes' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('This monitoring rule no longer exists.');
+    expect(screen.getByText('Step 3 of 3')).toBeInTheDocument();
+  });
+
+  test('leaving an edit and creating a new rule starts empty and validates without a rule ID', async () => {
+    const user = await startEdit();
+
+    await user.click(screen.getAllByRole('button', { name: /Back to Monitoring Rules/ })[0]);
+    expect(await screen.findByRole('tablist', { name: 'Monitoring rule status tabs' })).toBeInTheDocument();
+    expect(apiService.updateMonitoringRule).not.toHaveBeenCalled();
+
+    await reachReview(user);
+    expect(screen.getByText('Create Monitoring Rule')).toBeInTheDocument();
+    expect(apiService.validateMonitoringRule).toHaveBeenCalledTimes(1);
+    expect(apiService.validateMonitoringRule.mock.calls[0]).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Activate Rule' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save as Draft' })).toBeInTheDocument();
   });
 });

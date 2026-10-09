@@ -28,6 +28,19 @@ const CREATE_STATUS_BY_ACTION = Object.freeze({
   [RULE_ACTIONS.SAVE_DRAFT]: RULE_STATUSES.DRAFT
 });
 
+// Status changes of a saved rule. INACTIVE is final in the current UC04 scope (no reactivation).
+const RULE_OPERATIONS = Object.freeze({
+  EDIT: 'EDIT',
+  ACTIVATE: 'ACTIVATE',
+  DEACTIVATE: 'DEACTIVATE'
+});
+
+const TRANSITIONS = Object.freeze({
+  [RULE_OPERATIONS.EDIT]: { from: RULE_STATUSES.DRAFT, to: RULE_STATUSES.DRAFT, verb: 'edited' },
+  [RULE_OPERATIONS.ACTIVATE]: { from: RULE_STATUSES.DRAFT, to: RULE_STATUSES.ACTIVE, verb: 'activated' },
+  [RULE_OPERATIONS.DEACTIVATE]: { from: RULE_STATUSES.ACTIVE, to: RULE_STATUSES.INACTIVE, verb: 'deactivated' }
+});
+
 // RULE_ACTIONS in the { value } option shape used by the field checks
 const ACTION_OPTIONS = Object.freeze(Object.values(RULE_ACTIONS).map((value) => Object.freeze({ value })));
 
@@ -280,9 +293,33 @@ class MonitoringRuleRules {
     }
     return CREATE_STATUS_BY_ACTION[action];
   }
+
+  /**
+   * Status of a saved rule after an operation:
+   * EDIT DRAFT -> DRAFT, ACTIVATE DRAFT -> ACTIVE, DEACTIVATE ACTIVE -> INACTIVE.
+   * @throws {Error} with status 409 when the rule is not in the required status,
+   *                 status 500 for an unknown operation (a programming error)
+   */
+  static resolveTransition(operation, currentStatus) {
+    const transition = Object.hasOwn(TRANSITIONS, operation) ? TRANSITIONS[operation] : null;
+    if (!transition) {
+      const err = new Error(`Unknown monitoring rule operation "${operation}".`);
+      err.status = 500;
+      throw err;
+    }
+    if (currentStatus !== transition.from) {
+      const err = new Error(
+        `Only ${transition.from} rules can be ${transition.verb}. This rule is ${currentStatus}. No changes were saved.`
+      );
+      err.status = 409;
+      throw err;
+    }
+    return transition.to;
+  }
 }
 
 module.exports = MonitoringRuleRules;
+module.exports.RULE_OPERATIONS = RULE_OPERATIONS;
 module.exports.ERROR_CODES = ERROR_CODES;
 module.exports.CONFLICT_TYPES = CONFLICT_TYPES;
 module.exports.ENFORCED_STATUSES = ENFORCED_STATUSES;

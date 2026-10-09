@@ -19,7 +19,27 @@ export const LIST_TABS = Object.freeze({
   ALL: 'ALL',
   ACTIVE: 'ACTIVE',
   DRAFT: 'DRAFT',
+  INACTIVE: 'INACTIVE',
 });
+
+// Actions on a saved rule. Every list row offers VIEW only; the details dialog offers the status
+// actions, which mirror the backend lifecycle (DRAFT -> edit / activate, ACTIVE -> deactivate,
+// INACTIVE is final).
+export const RULE_ROW_ACTIONS = Object.freeze({
+  VIEW: 'VIEW',
+  EDIT: 'EDIT',
+  ACTIVATE: 'ACTIVATE',
+  DEACTIVATE: 'DEACTIVATE',
+});
+
+const ACTIONS_BY_STATUS = {
+  [RULE_STATUSES.DRAFT]: [RULE_ROW_ACTIONS.EDIT, RULE_ROW_ACTIONS.ACTIVATE],
+  [RULE_STATUSES.ACTIVE]: [RULE_ROW_ACTIONS.DEACTIVATE],
+};
+
+// Status actions offered in the details dialog; an INACTIVE or unknown status offers none
+export const getRuleActions = (status) =>
+  (Object.hasOwn(ACTIONS_BY_STATUS, status) ? ACTIONS_BY_STATUS[status] : []);
 
 export const NOT_RECORDED = 'Not recorded';
 
@@ -126,6 +146,17 @@ export const countByTab = (rules) => ({
   [LIST_TABS.ALL]: rules.length,
   [LIST_TABS.ACTIVE]: filterByTab(rules, LIST_TABS.ACTIVE).length,
   [LIST_TABS.DRAFT]: filterByTab(rules, LIST_TABS.DRAFT).length,
+  [LIST_TABS.INACTIVE]: filterByTab(rules, LIST_TABS.INACTIVE).length,
+});
+
+// A saved rule's values in the configuration-form shape (the inverse of buildRulePayload)
+export const toRuleForm = (rule) => ({
+  hazardType: rule?.hazardType || '',
+  riskZoneId: rule?.riskZoneId ?? '',
+  alertPriority: rule?.alertPriority || '',
+  notificationRecipients: Array.isArray(rule?.notificationRecipients) ? [...rule.notificationRecipients] : [],
+  responseBehaviour: rule?.responseBehaviour || '',
+  notes: rule?.notes || '',
 });
 
 /**
@@ -180,3 +211,9 @@ export const describeApiError = (error) => {
       return error.message || 'Something went wrong while processing the monitoring rule request.';
   }
 };
+
+// Same mapping for requests on one saved rule, where a 404 means the rule (not the park) is gone
+export const describeRuleError = (error) =>
+  (error?.status === 404
+    ? 'This monitoring rule no longer exists. Refresh the list and try again.'
+    : describeApiError(error));

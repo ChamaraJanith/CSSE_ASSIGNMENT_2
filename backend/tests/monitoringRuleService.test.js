@@ -3,7 +3,7 @@ const { getPool } = require('../pgPool');
 const monitoringRuleService = require('../services/monitoringRuleService');
 const monitoringRuleConfig = require('../utils/monitoringRuleConfig');
 const {
-  MANAGER_ID, HAZARD, CREATED_AT, yalaPark, zoneRow, ruleRow, ruleInput, createSupabaseFake, createRulePgFake
+  MANAGER_ID, HAZARD, CREATED_AT, UPDATED_AT, yalaPark, zoneRow, ruleRow, ruleInput, createSupabaseFake, createRulePgFake
 } = require('./helpers/monitoringRuleFakes');
 
 jest.mock('../supabaseClient', () => ({
@@ -637,6 +637,393 @@ describe('UC04: Monitoring Rule Service', () => {
         expect(db.steps().at(-1)).toBe('ROLLBACK');
         expect(db.client.release).toHaveBeenCalledTimes(1);
       }
+    });
+  });
+
+  describe('validateRule with an optional rule ID (editing a saved draft)', () => {
+    test('[POSITIVE CASE] the draft being edited should not be reported as a duplicate of itself', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' })] });
+      await expect(monitoringRuleService.validateRule(ruleInput({ ruleId: 10 })))
+        .resolves.toMatchObject({ valid: true, conflicts: [] });
+      expect(db.steps()).toEqual(VALIDATION_READS);
+    });
+
+    test('[NEGATIVE CASE] without the rule ID the same draft is a duplicate (self-exclusion only by id)', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' })] });
+      await expect(monitoringRuleService.validateRule(ruleInput()))
+        .resolves.toMatchObject({ valid: false, conflicts: [expect.objectContaining({ type: 'DUPLICATE', ruleId: 10 })] });
+    });
+
+    test('[NEGATIVE CASE] other duplicates and active conflicts are still reported', async () => {
+      createRulePgFake(getPool, {
+        existingRules: [
+          ruleRow({ id: 10, status: 'DRAFT' }),
+          ruleRow({ id: 11, status: 'DRAFT' }),
+          ruleRow({ id: 12, status: 'ACTIVE', alert_priority: 'LOW', activated_at: CREATED_AT })
+        ]
+      });
+      const result = await monitoringRuleService.validateRule(ruleInput({ ruleId: 10 }));
+      expect(result.valid).toBe(false);
+      expect(result.conflicts.map((c) => [c.type, c.ruleId])).toEqual([['DUPLICATE', 11], ['CONFLICT', 12]]);
+    });
+
+    test('[EDGE CASE] a null rule ID should be treated as a new rule', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' })] });
+      await expect(monitoringRuleService.validateRule(ruleInput({ ruleId: null })))
+        .resolves.toMatchObject({ valid: false, conflicts: [expect.objectContaining({ ruleId: 10 })] });
+    });
+
+    test.each(['10', 0, -3, 1.5, true, {}])('[NEGATIVE CASE] an invalid rule ID %p should be rejected with 400 before any read', async (ruleId) => {
+      const db = createRulePgFake(getPool);
+      await expect(monitoringRuleService.validateRule(ruleInput({ ruleId })))
+        .rejects.toMatchObject({ status: 400, message: 'Rule ID must be a positive integer.' });
+      expect(db.statements).toHaveLength(0);
+    });
+  });
+
+  describe('updateDraft (PUT /:id)', () => {
+    const UPDATE_STEPS = ['BEGIN', 'LOCK_RULE', 'LOCK_SCOPE', ...VALIDATION_READS, 'UPDATE_CONFIGURATION', 'COMMIT'];
+    const draft = (overrides = {}) => ruleRow({ id: 10, status: 'DRAFT', alert_priority: 'LOW', ...overrides });
+
+    test('[POSITIVE CASE] should update the draft in place, keeping its id, creator, creation time and DRAFT status', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [draft()] });
+      const updated = await monitoringRuleService.updateDraft(10, ruleInput({ alertPriority: 'CRITICAL' }), MANAGER_ID);
+
+      expect(updated).toMatchObject({
+        id: 10, status: 'DRAFT', alertPriority: 'CRITICAL', activatedAt: null,
+        createdBy: MANAGER_ID, createdAt: CREATED_AT, updatedAt: UPDATED_AT,
+        notificationRecipients: ['park_manager', 'wildlife_officer'], notes: 'Snare lines reported near the fence'
+      });
+      expect(db.steps()).toEqual(UPDATE_STEPS);
+      expect(db.find('INSERT')).toHaveLength(0);
+      expect(db.state.existingRules).toHaveLength(1);
+    });
+
+    test('[POSITIVE CASE] the UPDATE only changes configuration columns and updated_at', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [draft()] });
+      await monitoringRuleService.updateDraft(10, ruleInput(), MANAGER_ID);
+      const [update] = db.find('UPDATE public.monitoring_rules');
+
+      expect(update.sql).toMatch(/updated_at = NOW\(\)/);
+      expect(update.sql).toMatch(/WHERE id = \$1/);
+      const setClause = update.sql.split('RETURNING')[0];
+      expect(setClause).not.toMatch(/created_by|created_at|park_id|status|activated_at/);
+      expect(update.params).toEqual([
+        10, HAZARD, 2, 'HIGH', JSON.stringify(['park_manager', 'wildlife_officer']), expect.any(String),
+        'Snare lines reported near the fence'
+      ]);
+    });
+
+    test('[POSITIVE CASE] saving an unchanged draft should not conflict with itself', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' })] });
+      await expect(monitoringRuleService.updateDraft(10, ruleInput(), MANAGER_ID)).resolves.toMatchObject({ id: 10 });
+    });
+
+    test('[POSITIVE CASE] an edit by another Park Manager keeps the original creator', async () => {
+      createRulePgFake(getPool, { existingRules: [draft()] });
+      const updated = await monitoringRuleService.updateDraft(10, ruleInput(), 'dddddddd-0000-0000-0000-000000000005');
+      expect(updated.createdBy).toBe(MANAGER_ID);
+    });
+
+    test('[EDGE CASE] an action in the body should be ignored: the rule stays a DRAFT', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [draft()] });
+      const updated = await monitoringRuleService.updateDraft(10, ruleInput({ action: 'ACTIVATE' }), MANAGER_ID);
+      expect(updated).toMatchObject({ status: 'DRAFT', activatedAt: null });
+      expect(db.steps()).not.toContain('UPDATE_STATUS');
+    });
+
+    test('[POSITIVE CASE] the scope lock should be taken for the new hazard after the row lock', async () => {
+      const otherHazard = monitoringRuleConfig.HAZARD_TYPES[1].value;
+      const db = createRulePgFake(getPool, { existingRules: [draft()] });
+      await monitoringRuleService.updateDraft(10, ruleInput({ hazardType: otherHazard }), MANAGER_ID);
+      expect(db.find('SELECT pg_advisory_xact_lock')[0].params).toEqual([`monitoring_rule:1:${otherHazard}:2`]);
+      expect(db.steps().indexOf('LOCK_RULE')).toBeLessThan(db.steps().indexOf('LOCK_SCOPE'));
+    });
+
+    test('[NEGATIVE CASE] an unknown rule should return 404 and roll back', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [] });
+      await expect(monitoringRuleService.updateDraft(99, ruleInput(), MANAGER_ID))
+        .rejects.toMatchObject({ status: 404, message: 'Monitoring rule not found.' });
+      expect(db.steps()).toEqual(['BEGIN', 'LOCK_RULE', 'ROLLBACK']);
+      expect(db.client.release).toHaveBeenCalledTimes(1);
+    });
+
+    test.each([
+      ['ACTIVE', { activated_at: CREATED_AT }],
+      ['INACTIVE', {}]
+    ])('[NEGATIVE CASE] an %s rule should not be editable (409)', async (status, extra) => {
+      const db = createRulePgFake(getPool, { existingRules: [draft({ status, ...extra })] });
+      await expect(monitoringRuleService.updateDraft(10, ruleInput(), MANAGER_ID))
+        .rejects.toMatchObject({ status: 409, message: expect.stringMatching(/Only DRAFT rules can be edited/) });
+      expect(db.find('UPDATE')).toHaveLength(0);
+      expect(db.steps().at(-1)).toBe('ROLLBACK');
+    });
+
+    test('[NEGATIVE CASE] invalid fields should return 400 with every error and no UPDATE', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [draft()] });
+      const promise = monitoringRuleService.updateDraft(10, ruleInput({ alertPriority: 'URGENT', notificationRecipients: [] }), MANAGER_ID);
+      await expect(promise).rejects.toMatchObject({
+        status: 400,
+        errors: [
+          expect.objectContaining({ field: 'alertPriority', code: 'INVALID_VALUE' }),
+          expect.objectContaining({ field: 'notificationRecipients', code: 'REQUIRED' })
+        ]
+      });
+      expect(db.find('UPDATE')).toHaveLength(0);
+    });
+
+    test('[NEGATIVE CASE] moving a saved rule to another park should be rejected with 400', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [draft()] });
+      await expect(monitoringRuleService.updateDraft(10, ruleInput({ parkId: 2 }), MANAGER_ID))
+        .rejects.toMatchObject({
+          status: 400,
+          errors: expect.arrayContaining([expect.objectContaining({ field: 'parkId', code: 'INVALID_VALUE' })])
+        });
+      expect(db.find('UPDATE')).toHaveLength(0);
+    });
+
+    test('[NEGATIVE CASE] DC1: an identical other draft should block the edit with 409', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [draft(), ruleRow({ id: 11, status: 'DRAFT' })] });
+      await expect(monitoringRuleService.updateDraft(10, ruleInput(), MANAGER_ID))
+        .rejects.toMatchObject({ status: 409, conflicts: [expect.objectContaining({ type: 'DUPLICATE', ruleId: 11 })] });
+      expect(db.find('UPDATE')).toHaveLength(0);
+    });
+
+    test('[NEGATIVE CASE] DC2: an ACTIVE rule with a different configuration should block the edit with 409', async () => {
+      createRulePgFake(getPool, {
+        existingRules: [draft(), ruleRow({ id: 12, status: 'ACTIVE', alert_priority: 'MEDIUM', activated_at: CREATED_AT })]
+      });
+      await expect(monitoringRuleService.updateDraft(10, ruleInput({ alertPriority: 'CRITICAL' }), MANAGER_ID))
+        .rejects.toMatchObject({ status: 409, conflicts: [expect.objectContaining({ type: 'CONFLICT', ruleId: 12 })] });
+    });
+
+    test.each(['10', 0, -1, 2.5, null])('[NEGATIVE CASE] an invalid rule ID %p should return 400 without a transaction', async (ruleId) => {
+      const db = createRulePgFake(getPool, { existingRules: [draft()] });
+      await expect(monitoringRuleService.updateDraft(ruleId, ruleInput(), MANAGER_ID))
+        .rejects.toMatchObject({ status: 400, message: 'Rule ID must be a positive integer.' });
+      expect(db.pool.connect).not.toHaveBeenCalled();
+    });
+
+    test('[NEGATIVE CASE] a missing user should return 401', async () => {
+      createRulePgFake(getPool, { existingRules: [draft()] });
+      await expect(monitoringRuleService.updateDraft(10, ruleInput(), null)).rejects.toMatchObject({ status: 401 });
+    });
+
+    test('[ERROR CASE] a database failure should roll back and return a safe 500', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [draft()], failOn: 'UPDATE public.monitoring_rules' });
+      const promise = monitoringRuleService.updateDraft(10, ruleInput(), MANAGER_ID);
+      await expect(promise).rejects.toMatchObject({ status: 500, message: 'Failed to update the draft monitoring rule. No changes were saved.' });
+      await promise.catch((err) => expect(err.message).not.toMatch(/relation|internal/));
+      expect(db.steps().at(-1)).toBe('ROLLBACK');
+      expect(db.client.release).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('activateRule (POST /:id/activate)', () => {
+    const ACTIVATE_STEPS = ['BEGIN', 'LOCK_RULE', 'LOCK_SCOPE', ...VALIDATION_READS, 'UPDATE_STATUS', 'COMMIT'];
+
+    test('[POSITIVE CASE] a DRAFT should become ACTIVE in place with activated_at and updated_at set', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' })] });
+      const activated = await monitoringRuleService.activateRule(10, MANAGER_ID);
+
+      expect(activated).toMatchObject({
+        id: 10, status: 'ACTIVE', activatedAt: UPDATED_AT, updatedAt: UPDATED_AT, createdAt: CREATED_AT,
+        createdBy: MANAGER_ID, alertPriority: 'HIGH'
+      });
+      expect(db.steps()).toEqual(ACTIVATE_STEPS);
+      expect(db.find('UPDATE public.monitoring_rules')[0].params).toEqual([10, 'ACTIVE', true]);
+      expect(db.find('INSERT')).toHaveLength(0);
+    });
+
+    test('[POSITIVE CASE] the stored configuration is revalidated, with the draft excluded from its own duplicate check', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' })] });
+      await monitoringRuleService.activateRule(10, MANAGER_ID);
+      expect(db.find('SELECT id, code, name FROM public.parks')[0].params).toEqual([1]);
+      expect(db.find('SELECT id, park_id, zone_code')[0].params).toEqual([2]);
+      expect(db.find('SELECT pg_advisory_xact_lock')[0].params).toEqual([`monitoring_rule:1:${HAZARD}:2`]);
+    });
+
+    test('[NEGATIVE CASE] DC2: an ACTIVE rule with a different configuration should block activation with 409', async () => {
+      const db = createRulePgFake(getPool, {
+        existingRules: [ruleRow({ id: 10, status: 'DRAFT' }), ruleRow({ id: 12, status: 'ACTIVE', alert_priority: 'LOW', activated_at: CREATED_AT })]
+      });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID)).rejects.toMatchObject({
+        status: 409,
+        message: 'The monitoring rule duplicates or conflicts with an existing rule. No changes were saved.',
+        conflicts: [expect.objectContaining({ type: 'CONFLICT', ruleId: 12 })]
+      });
+      expect(db.find('UPDATE')).toHaveLength(0);
+      expect(db.steps().at(-1)).toBe('ROLLBACK');
+    });
+
+    test('[NEGATIVE CASE] DC1: an identical other DRAFT should block activation with 409', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' }), ruleRow({ id: 11, status: 'DRAFT' })] });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID))
+        .rejects.toMatchObject({ status: 409, conflicts: [expect.objectContaining({ type: 'DUPLICATE', ruleId: 11 })] });
+    });
+
+    test('[POSITIVE CASE] DC3/DC4: other drafts with a different configuration and INACTIVE rules do not block activation', async () => {
+      createRulePgFake(getPool, {
+        existingRules: [
+          ruleRow({ id: 10, status: 'DRAFT' }),
+          ruleRow({ id: 11, status: 'DRAFT', alert_priority: 'LOW' }),
+          ruleRow({ id: 13, status: 'INACTIVE' })
+        ]
+      });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID)).resolves.toMatchObject({ status: 'ACTIVE' });
+    });
+
+    test.each([
+      ['ACTIVE', { activated_at: CREATED_AT }, /Only DRAFT rules can be activated\. This rule is ACTIVE/],
+      ['INACTIVE', {}, /Only DRAFT rules can be activated\. This rule is INACTIVE/]
+    ])('[NEGATIVE CASE] an %s rule cannot be activated (409)', async (status, extra, message) => {
+      const db = createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status, ...extra })] });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID)).rejects.toMatchObject({ status: 409, message: expect.stringMatching(message) });
+      expect(db.steps()).toEqual(['BEGIN', 'LOCK_RULE', 'ROLLBACK']);
+    });
+
+    test('[NEGATIVE CASE] an unknown rule should return 404', async () => {
+      createRulePgFake(getPool, { existingRules: [] });
+      await expect(monitoringRuleService.activateRule(404, MANAGER_ID)).rejects.toMatchObject({ status: 404, message: 'Monitoring rule not found.' });
+    });
+
+    test('[NEGATIVE CASE] a stored value no longer configured should return 400 asking to edit the draft', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT', hazard_type: 'RETIRED_HAZARD' })] });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID)).rejects.toMatchObject({
+        status: 400,
+        message: expect.stringMatching(/no longer passes validation\. Edit the draft/),
+        errors: [expect.objectContaining({ field: 'hazardType', code: 'INVALID_VALUE' })]
+      });
+      expect(db.find('UPDATE')).toHaveLength(0);
+    });
+
+    test('[NEGATIVE CASE] a risk zone that no longer belongs to the park should return 400', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' })], zone: zoneRow({ park_id: 3 }) });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID))
+        .rejects.toMatchObject({ status: 400, errors: [expect.objectContaining({ code: 'ZONE_NOT_IN_PARK' })] });
+    });
+
+    test.each(['10', 0, -1, 1.5])('[NEGATIVE CASE] an invalid rule ID %p should return 400 without a transaction', async (ruleId) => {
+      const db = createRulePgFake(getPool);
+      await expect(monitoringRuleService.activateRule(ruleId, MANAGER_ID)).rejects.toMatchObject({ status: 400 });
+      expect(db.pool.connect).not.toHaveBeenCalled();
+    });
+
+    test('[NEGATIVE CASE] a missing user should return 401', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })] });
+      await expect(monitoringRuleService.activateRule(10, undefined)).rejects.toMatchObject({ status: 401 });
+    });
+
+    test('[EDGE CASE] a concurrent activation caught by the unique index should return 409, not 500', async () => {
+      const db = createRulePgFake(getPool, {
+        existingRules: [ruleRow({ id: 10, status: 'DRAFT' })],
+        failOn: 'UPDATE public.monitoring_rules',
+        failWith: uniqueViolation()
+      });
+      const promise = monitoringRuleService.activateRule(10, MANAGER_ID);
+      await expect(promise).rejects.toMatchObject({
+        status: 409, message: 'An ACTIVE rule already exists for this park, hazard and risk zone. No changes were saved.', conflicts: []
+      });
+      expect(db.steps().at(-1)).toBe('ROLLBACK');
+    });
+
+    test('[ERROR CASE] a database failure should roll back and return a safe 500', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })], failOn: 'SELECT id, park_id, hazard_type' });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID))
+        .rejects.toMatchObject({ status: 500, message: 'Failed to activate the monitoring rule. No changes were saved.' });
+      expect(db.steps()).not.toContain('COMMIT');
+      expect(db.client.release).toHaveBeenCalledTimes(1);
+    });
+
+    test('[EDGE CASE] of two different drafts in one scope, only the first activation succeeds', async () => {
+      createRulePgFake(getPool, {
+        existingRules: [ruleRow({ id: 10, status: 'DRAFT' }), ruleRow({ id: 11, status: 'DRAFT', alert_priority: 'LOW' })]
+      });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID)).resolves.toMatchObject({ status: 'ACTIVE' });
+      await expect(monitoringRuleService.activateRule(11, MANAGER_ID))
+        .rejects.toMatchObject({ status: 409, conflicts: [expect.objectContaining({ type: 'CONFLICT', ruleId: 10 })] });
+    });
+  });
+
+  describe('deactivateRule (POST /:id/deactivate)', () => {
+    const activeRule = (overrides = {}) => ruleRow({ id: 12, status: 'ACTIVE', activated_at: CREATED_AT, notes: 'Keep', ...overrides });
+
+    test('[POSITIVE CASE] an ACTIVE rule should become INACTIVE with activated_at cleared and its configuration kept', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [activeRule()] });
+      const deactivated = await monitoringRuleService.deactivateRule(12, MANAGER_ID);
+
+      expect(deactivated).toMatchObject({
+        id: 12, status: 'INACTIVE', activatedAt: null, updatedAt: UPDATED_AT, createdAt: CREATED_AT, createdBy: MANAGER_ID,
+        hazardType: HAZARD, riskZoneId: 2, alertPriority: 'HIGH', notes: 'Keep',
+        notificationRecipients: ['park_manager', 'wildlife_officer']
+      });
+      expect(db.steps()).toEqual(['BEGIN', 'LOCK_RULE', 'UPDATE_STATUS', 'COMMIT']);
+      const [update] = db.find('UPDATE public.monitoring_rules');
+      expect(update.params).toEqual([12, 'INACTIVE', false]);
+      expect(update.sql).toMatch(/activated_at = CASE WHEN \$3::boolean THEN NOW\(\) ELSE NULL END, updated_at = NOW\(\)/);
+    });
+
+    test.each(['DRAFT', 'INACTIVE'])('[NEGATIVE CASE] a %s rule cannot be deactivated (409)', async (status) => {
+      const db = createRulePgFake(getPool, { existingRules: [activeRule({ status, activated_at: null })] });
+      await expect(monitoringRuleService.deactivateRule(12, MANAGER_ID))
+        .rejects.toMatchObject({ status: 409, message: expect.stringMatching(/Only ACTIVE rules can be deactivated/) });
+      expect(db.find('UPDATE')).toHaveLength(0);
+      expect(db.steps().at(-1)).toBe('ROLLBACK');
+    });
+
+    test('[NEGATIVE CASE] an unknown rule should return 404', async () => {
+      createRulePgFake(getPool, { existingRules: [] });
+      await expect(monitoringRuleService.deactivateRule(12, MANAGER_ID)).rejects.toMatchObject({ status: 404 });
+    });
+
+    test.each(['12', 0, -12, 1.5])('[NEGATIVE CASE] an invalid rule ID %p should return 400', async (ruleId) => {
+      const db = createRulePgFake(getPool);
+      await expect(monitoringRuleService.deactivateRule(ruleId, MANAGER_ID)).rejects.toMatchObject({ status: 400 });
+      expect(db.pool.connect).not.toHaveBeenCalled();
+    });
+
+    test('[NEGATIVE CASE] a missing user should return 401', async () => {
+      createRulePgFake(getPool, { existingRules: [activeRule()] });
+      await expect(monitoringRuleService.deactivateRule(12, null)).rejects.toMatchObject({ status: 401 });
+    });
+
+    test('[ERROR CASE] a database failure should roll back and return a safe 500', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [activeRule()], failOn: 'UPDATE public.monitoring_rules' });
+      await expect(monitoringRuleService.deactivateRule(12, MANAGER_ID))
+        .rejects.toMatchObject({ status: 500, message: 'Failed to deactivate the monitoring rule. No changes were saved.' });
+      expect(db.steps().at(-1)).toBe('ROLLBACK');
+      expect(db.state.existingRules[0].status).toBe('ACTIVE');
+    });
+
+    test('[POSITIVE CASE] deactivation frees the scope: a different configuration can then be activated', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [activeRule()] });
+      await expect(monitoringRuleService.createRule(ruleInput({ alertPriority: 'LOW', action: 'ACTIVATE' }), MANAGER_ID))
+        .rejects.toMatchObject({ status: 409 });
+
+      await monitoringRuleService.deactivateRule(12, MANAGER_ID);
+      await expect(monitoringRuleService.createRule(ruleInput({ alertPriority: 'LOW', action: 'ACTIVATE' }), MANAGER_ID))
+        .resolves.toMatchObject({ status: 'ACTIVE' });
+      expect(db.find('INSERT INTO public.monitoring_rules')).toHaveLength(1);
+    });
+  });
+
+  describe('Saved rule lifecycle (DRAFT -> ACTIVE -> INACTIVE)', () => {
+    test('[POSITIVE CASE] a draft can be edited, activated and deactivated, and nothing after that', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'DRAFT' })] });
+
+      await expect(monitoringRuleService.updateDraft(10, ruleInput({ alertPriority: 'CRITICAL' }), MANAGER_ID))
+        .resolves.toMatchObject({ id: 10, status: 'DRAFT', alertPriority: 'CRITICAL' });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID)).resolves.toMatchObject({ id: 10, status: 'ACTIVE' });
+      await expect(monitoringRuleService.updateDraft(10, ruleInput(), MANAGER_ID)).rejects.toMatchObject({ status: 409 });
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID)).rejects.toMatchObject({ status: 409 });
+      await expect(monitoringRuleService.deactivateRule(10, MANAGER_ID)).resolves.toMatchObject({ id: 10, status: 'INACTIVE', activatedAt: null });
+
+      await expect(monitoringRuleService.activateRule(10, MANAGER_ID)).rejects.toMatchObject({ status: 409 });
+      await expect(monitoringRuleService.updateDraft(10, ruleInput(), MANAGER_ID)).rejects.toMatchObject({ status: 409 });
+      await expect(monitoringRuleService.deactivateRule(10, MANAGER_ID)).rejects.toMatchObject({ status: 409 });
+
+      expect(db.state.existingRules).toEqual([expect.objectContaining({ id: 10, status: 'INACTIVE', alert_priority: 'CRITICAL' })]);
+      expect(db.find('INSERT')).toHaveLength(0);
     });
   });
 });

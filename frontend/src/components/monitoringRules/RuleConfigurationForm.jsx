@@ -66,9 +66,10 @@ function ZoneInfo({ zone, parkName }) {
   );
 }
 
+// The same flow configures a new rule and edits a saved draft; only the title differs
 export default function RuleConfigurationForm({
   parkName, riskZones, options, form, step, errors, conflicts, message, submitting, focusKey,
-  onFieldChange, onStepChange, onSubmit, onCancel,
+  title = 'Create Monitoring Rule', onFieldChange, onStepChange, onSubmit, onCancel,
 }) {
   const formRef = useRef(null);
   const fieldErrors = groupErrorsByField(errors);
@@ -98,7 +99,7 @@ export default function RuleConfigurationForm({
     <div className="panel-card mr-panel">
       <div className="panel-header mr-panel-header">
         <div>
-          <div className="panel-title">Create Monitoring Rule</div>
+          <div className="panel-title">{title}</div>
           <span className="mr-step-indicator">Step {step} of {TOTAL_STEPS}</span>
         </div>
         <button type="button" className="btn-tactical btn-tactical-secondary" onClick={onCancel} disabled={submitting}>

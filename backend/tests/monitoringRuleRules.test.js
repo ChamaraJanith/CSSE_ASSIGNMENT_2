@@ -588,4 +588,51 @@ describe('UC04: Configure Park-Specific Wildlife Monitoring Rules - Business Rul
       });
     });
   });
+
+  describe('resolveTransition (saved rule lifecycle)', () => {
+    const { RULE_OPERATIONS } = monitoringRuleRules;
+
+    const thrownBy = (operation, status) => {
+      try {
+        monitoringRuleRules.resolveTransition(operation, status);
+      } catch (err) {
+        return err;
+      }
+      return null;
+    };
+
+    test.each([
+      [RULE_OPERATIONS.EDIT, RULE_STATUSES.DRAFT, RULE_STATUSES.DRAFT],
+      [RULE_OPERATIONS.ACTIVATE, RULE_STATUSES.DRAFT, RULE_STATUSES.ACTIVE],
+      [RULE_OPERATIONS.DEACTIVATE, RULE_STATUSES.ACTIVE, RULE_STATUSES.INACTIVE]
+    ])('[POSITIVE CASE] %s of a %s rule should give %s', (operation, from, to) => {
+      expect(monitoringRuleRules.resolveTransition(operation, from)).toBe(to);
+    });
+
+    test.each([
+      [RULE_OPERATIONS.EDIT, RULE_STATUSES.ACTIVE, /Only DRAFT rules can be edited\. This rule is ACTIVE/],
+      [RULE_OPERATIONS.EDIT, RULE_STATUSES.INACTIVE, /Only DRAFT rules can be edited/],
+      [RULE_OPERATIONS.ACTIVATE, RULE_STATUSES.ACTIVE, /Only DRAFT rules can be activated/],
+      [RULE_OPERATIONS.ACTIVATE, RULE_STATUSES.INACTIVE, /Only DRAFT rules can be activated\. This rule is INACTIVE/],
+      [RULE_OPERATIONS.DEACTIVATE, RULE_STATUSES.DRAFT, /Only ACTIVE rules can be deactivated/],
+      [RULE_OPERATIONS.DEACTIVATE, RULE_STATUSES.INACTIVE, /Only ACTIVE rules can be deactivated/]
+    ])('[NEGATIVE CASE] %s of a %s rule should throw 409', (operation, status, message) => {
+      const err = thrownBy(operation, status);
+      expect(err).toBeInstanceOf(Error);
+      expect(err.status).toBe(409);
+      expect(err.message).toMatch(message);
+      expect(err.message).toMatch(/No changes were saved/);
+    });
+
+    test('[EDGE CASE] an INACTIVE rule can never be reactivated or edited', () => {
+      Object.values(RULE_OPERATIONS)
+        .filter((operation) => operation !== RULE_OPERATIONS.DEACTIVATE)
+        .forEach((operation) => expect(thrownBy(operation, RULE_STATUSES.INACTIVE)).toMatchObject({ status: 409 }));
+      expect(thrownBy(RULE_OPERATIONS.DEACTIVATE, RULE_STATUSES.INACTIVE)).toMatchObject({ status: 409 });
+    });
+
+    test.each(['PUBLISH', undefined, 'toString', '__proto__'])('[ERROR CASE] unknown operation %p should throw 500', (operation) => {
+      expect(thrownBy(operation, RULE_STATUSES.DRAFT)).toMatchObject({ status: 500 });
+    });
+  });
 });

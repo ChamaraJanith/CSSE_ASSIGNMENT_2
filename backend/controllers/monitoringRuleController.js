@@ -1,7 +1,7 @@
 const monitoringRuleService = require('../services/monitoringRuleService');
 const { RULE_STATUSES } = require('../utils/monitoringRuleConfig');
 
-// Query strings arrive as text: a plain digit string becomes a number, anything else is passed
+// Query strings and route params arrive as text: a plain digit string becomes a number, anything else is passed
 // through unchanged so the service rejects it with its own 400 (validation stays in the service).
 const toIdNumber = (raw) => (typeof raw === 'string' && /^\d+$/.test(raw) ? Number(raw) : raw);
 
@@ -72,9 +72,44 @@ const createRule = async (req, res) => {
     }
 };
 
+// Saves changes to a DRAFT; the rule keeps its id and stays a DRAFT
+const updateDraft = async (req, res) => {
+    try {
+        if (!isJsonObject(req.body)) {
+            return res.status(400).json({ error: 'A JSON monitoring rule request body is required.' });
+        }
+
+        const data = await monitoringRuleService.updateDraft(toIdNumber(req.params.id), req.body, req.user.id);
+        res.status(200).json({ message: 'Draft monitoring rule updated.', data });
+    } catch (error) {
+        sendError(res, error, 'Update Draft Monitoring Rule Error');
+    }
+};
+
+const activateRule = async (req, res) => {
+    try {
+        const data = await monitoringRuleService.activateRule(toIdNumber(req.params.id), req.user.id);
+        res.status(200).json({ message: 'Monitoring rule activated successfully.', data });
+    } catch (error) {
+        sendError(res, error, 'Activate Monitoring Rule Error');
+    }
+};
+
+const deactivateRule = async (req, res) => {
+    try {
+        const data = await monitoringRuleService.deactivateRule(toIdNumber(req.params.id), req.user.id);
+        res.status(200).json({ message: 'Monitoring rule deactivated.', data });
+    } catch (error) {
+        sendError(res, error, 'Deactivate Monitoring Rule Error');
+    }
+};
+
 module.exports = {
     getReferenceData,
     listRules,
     validateRule,
-    createRule
+    createRule,
+    updateDraft,
+    activateRule,
+    deactivateRule
 };

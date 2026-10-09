@@ -241,13 +241,34 @@ class ApiService {
     return this.fetchWithHandleError(`/monitoring-rules?${params.toString()}`);
   }
 
-  // Dry run: sends only the rule configuration; the final action is chosen later on the review screen
-  async validateMonitoringRule(ruleData) {
+  // Dry run: sends only the rule configuration; the final action is chosen later on the review screen.
+  // ruleId (editing a saved draft) excludes that rule from its own duplicate detection.
+  async validateMonitoringRule(ruleData, ruleId = null) {
+    const payload = toMonitoringRulePayload(ruleData);
     return this.fetchWithHandleError('/monitoring-rules/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ruleId === null ? payload : { ...payload, ruleId })
+    });
+  }
+
+  // Saves changes to a DRAFT rule: same rule ID, still a DRAFT
+  async updateMonitoringRule(ruleId, ruleData) {
+    return this.fetchWithHandleError(`/monitoring-rules/${encodeURIComponent(ruleId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(toMonitoringRulePayload(ruleData))
     });
+  }
+
+  // DRAFT -> ACTIVE; the backend revalidates the stored rule
+  async activateMonitoringRule(ruleId) {
+    return this.fetchWithHandleError(`/monitoring-rules/${encodeURIComponent(ruleId)}/activate`, { method: 'POST' });
+  }
+
+  // ACTIVE -> INACTIVE
+  async deactivateMonitoringRule(ruleId) {
+    return this.fetchWithHandleError(`/monitoring-rules/${encodeURIComponent(ruleId)}/deactivate`, { method: 'POST' });
   }
 
   // action: 'ACTIVATE' | 'SAVE_DRAFT'. Status, creator and activation time are set by the backend.
