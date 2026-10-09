@@ -1,11 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { MapPin, AlertTriangle, RefreshCw } from 'lucide-react';
 import { apiService } from '../../services/api';
 import MonitoringRuleList from './MonitoringRuleList';
 import RuleConfigurationForm from './RuleConfigurationForm';
 import RuleReviewView from './RuleReviewView';
 import RuleResultView from './RuleResultView';
-import { EMPTY_RULE_FORM, LAST_STEP, buildRulePayload, describeApiError, firstStepWithError } from './monitoringRuleUtils';
+import RuleDetailsView from './RuleDetailsView';
+import RuleActivationDialog from './RuleActivationDialog';
+import {
+  EMPTY_RULE_FORM, LAST_STEP, LIST_TABS, RULE_ROW_ACTIONS, buildRulePayload, describeApiError, describeRuleError,
+  firstStepWithError, toRuleForm,
+} from './monitoringRuleUtils';
 import '../../pages/PatrolPlanning.css';
 import '../../pages/MonitoringRules.css';
 
@@ -28,6 +33,17 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
   const [rulesLoading, setRulesLoading] = useState(true);
   const [rulesError, setRulesError] = useState(null);
   const [rulesVersion, setRulesVersion] = useState(0);
+  const [activeTab, setActiveTab] = useState(LIST_TABS.ALL);
+  const [listNotice, setListNotice] = useState(null);
+
+  // Row actions: details dialog, and the Activate / Deactivate confirmation ({ mode, rule })
+  const [detailsRule, setDetailsRule] = useState(null);
+  const [statusAction, setStatusAction] = useState(null);
+  const [statusPending, setStatusPending] = useState(false);
+  const [statusError, setStatusError] = useState(null);
+
+  // The saved draft being edited through the configuration flow (null when creating a new rule)
+  const [editingRule, setEditingRule] = useState(null);
 
   const [form, setForm] = useState(EMPTY_RULE_FORM);
   const [step, setStep] = useState(1);
@@ -103,19 +119,82 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
     setFormMessage(null);
   };
 
-  const startNewRule = () => {
-    setForm(EMPTY_RULE_FORM);
+  // Opens the configuration flow with `values`; `rule` is the saved draft being edited, or null
+  const openConfiguration = (values, rule) => {
+    setForm(values);
     setStep(1);
     clearFeedback();
     setReviewRule(null);
     setReviewError(null);
     setResult(null);
+    setListNotice(null);
+    setEditingRule(rule);
     setScreen(SCREENS.CONFIGURE);
   };
+
+  const startNewRule = () => openConfiguration(EMPTY_RULE_FORM, null);
+
+  const startEditRule = (rule) => openConfiguration(toRuleForm(rule), rule);
 
   const backToList = () => {
     setScreen(SCREENS.LIST);
     setResult(null);
+    setEditingRule(null);
+  };
+
+  const openDetails = (rule) => {
+    setListNotice(null);
+    setDetailsRule(rule);
+  };
+
+  // Status actions chosen in the details dialog. Edit leaves the dialog for the configuration flow;
+  // Activate / Deactivate replace it with the confirmation dialog.
+  const handleRuleAction = (action, rule) => {
+    setDetailsRule(null);
+    if (action === RULE_ROW_ACTIONS.EDIT) {
+      startEditRule(rule);
+    } else if (action === RULE_ROW_ACTIONS.ACTIVATE || action === RULE_ROW_ACTIONS.DEACTIVATE) {
+      setStatusError(null);
+      setListNotice(null);
+      setStatusAction({ mode: action, rule });
+    }
+  };
+
+  const closeDetails = useCallback(() => setDetailsRule(null), []);
+
+  // Cancelling a confirmation returns to the details of the same rule; nothing is sent
+  const cancelStatusAction = useCallback(() => {
+    setDetailsRule(statusAction?.rule || null);
+    setStatusAction(null);
+    setStatusError(null);
+  }, [statusAction]);
+
+  // Activate (DRAFT) / Deactivate (ACTIVE). The list keeps its tab and is reloaded on success;
+  // a failure keeps the dialog open with the backend's safe message, field errors and conflicts.
+  const confirmStatusAction = async () => {
+    if (!statusAction || statusPending) return;
+    const { mode, rule } = statusAction;
+    const activating = mode === RULE_ROW_ACTIONS.ACTIVATE;
+    setStatusPending(true);
+    setStatusError(null);
+    try {
+      if (activating) {
+        await apiService.activateMonitoringRule(rule.id);
+      } else {
+        await apiService.deactivateMonitoringRule(rule.id);
+      }
+      setStatusAction(null);
+      setListNotice(`Monitoring rule #${rule.id} has been ${activating ? 'activated' : 'deactivated'}.`);
+      reloadRules();
+    } catch (error) {
+      setStatusError({
+        message: describeRuleError(error),
+        errors: error?.errors || [],
+        conflicts: error?.conflicts || [],
+      });
+    } finally {
+      setStatusPending(false);
+    }
   };
 
   // Review -> configuration (Back / Edit / stepper). The form keeps every value; the validated rule is
@@ -149,7 +228,11 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
     setValidating(true);
     clearFeedback();
     try {
-      const response = await apiService.validateMonitoringRule(buildRulePayload(form, parkId));
+      // An edited draft is sent with its ID so it is not reported as a duplicate of itself
+      const payload = buildRulePayload(form, parkId);
+      const response = editingRule
+        ? await apiService.validateMonitoringRule(payload, editingRule.id)
+        : await apiService.validateMonitoringRule(payload);
       const validation = response.data;
       if (validation.valid) {
         setReviewRule(validation.rule);
@@ -165,14 +248,18 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
     }
   };
 
+  // Creates a new rule, or saves an edited draft in place (PUT: same rule ID, still a draft)
   const handleCreate = async (action) => {
     if (creatingAction || !reviewRule) return;
     setCreatingAction(action);
     setReviewError(null);
     try {
-      const response = await apiService.createMonitoringRule(reviewRule, action);
-      setResult({ rule: response.data, action, message: response.message });
+      const response = editingRule
+        ? await apiService.updateMonitoringRule(editingRule.id, reviewRule)
+        : await apiService.createMonitoringRule(reviewRule, action);
+      setResult({ rule: response.data, action, message: response.message, edited: Boolean(editingRule) });
       setScreen(SCREENS.RESULT);
+      setEditingRule(null);
       reloadRules();
     } catch (error) {
       if (error?.status === 400) {
@@ -180,8 +267,8 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
       } else if (error?.status === 409) {
         showOnForm({ conflicts: error.conflicts || [], message: error.message });
       } else {
-        // 401 / 403 / 500 / network: stay on the review screen so nothing the user entered is lost
-        setReviewError(describeApiError(error));
+        // 401 / 403 / 404 / 500 / network: stay on the review screen so nothing the user entered is lost
+        setReviewError(editingRule ? describeRuleError(error) : describeApiError(error));
       }
     } finally {
       setCreatingAction(null);
@@ -191,6 +278,8 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
   const createHint = referenceLoading
     ? 'Loading risk zones and rule options for this park…'
     : null;
+
+  const flowTitle = editingRule ? `Edit Draft Monitoring Rule #${editingRule.id}` : 'Create Monitoring Rule';
 
   return (
     <div className="mr-container">
@@ -222,8 +311,38 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
           riskZones={riskZones}
           canCreate={Boolean(reference) && !referenceLoading}
           createHint={createHint}
+          activeTab={activeTab}
+          notice={listNotice}
+          onTabChange={setActiveTab}
           onRetry={reloadRules}
           onCreate={startNewRule}
+          onViewDetails={openDetails}
+        />
+      )}
+
+      {screen === SCREENS.LIST && detailsRule && (
+        <RuleDetailsView
+          rule={detailsRule}
+          parkName={displayParkName}
+          riskZones={riskZones}
+          options={options}
+          actionsDisabled={statusPending || !reference}
+          onAction={handleRuleAction}
+          onClose={closeDetails}
+        />
+      )}
+
+      {screen === SCREENS.LIST && statusAction && (
+        <RuleActivationDialog
+          mode={statusAction.mode}
+          rule={statusAction.rule}
+          parkName={displayParkName}
+          riskZones={riskZones}
+          options={options}
+          pending={statusPending}
+          error={statusError}
+          onCancel={cancelStatusAction}
+          onConfirm={confirmStatusAction}
         />
       )}
 
@@ -239,6 +358,7 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
           message={formMessage}
           submitting={validating}
           focusKey={focusKey}
+          title={flowTitle}
           onFieldChange={updateField}
           onStepChange={setStep}
           onSubmit={handleValidate}
@@ -254,6 +374,8 @@ export default function MonitoringRulesManager({ parkId, parkName }) {
           options={options}
           submittingAction={creatingAction}
           error={reviewError}
+          editing={Boolean(editingRule)}
+          title={flowTitle}
           onBack={() => returnToConfiguration(LAST_STEP)}
           onEdit={returnToConfiguration}
           onCreate={handleCreate}

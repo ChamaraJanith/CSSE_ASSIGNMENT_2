@@ -1,11 +1,11 @@
 import { describe, test, expect } from 'vitest';
 import {
-  EMPTY_RULE_FORM, FORM_STEPS, LAST_STEP, LIST_TABS, NOT_RECORDED, REVIEW_STEP, TOTAL_STEPS,
-  buildRulePayload, countByTab, describeApiError, filterByTab, findZone, firstStepWithError, formatRecipients,
-  formatZone, getFieldLabel, getOptionLabel, getRuleZoneLabel, getStatusLabel, groupErrorsByField, isStepComplete,
-  orderPriorityOptions, toZoneCircle, toggleRecipient,
+  EMPTY_RULE_FORM, FORM_STEPS, LAST_STEP, LIST_TABS, NOT_RECORDED, REVIEW_STEP, RULE_ROW_ACTIONS, TOTAL_STEPS,
+  buildRulePayload, countByTab, describeApiError, describeRuleError, filterByTab, findZone, firstStepWithError,
+  formatRecipients, formatZone, getFieldLabel, getOptionLabel, getRuleActions, getRuleZoneLabel, getStatusLabel,
+  groupErrorsByField, isStepComplete, orderPriorityOptions, toRuleForm, toZoneCircle, toggleRecipient,
 } from '../monitoringRuleUtils';
-import { EXISTING_RULES, OPTIONS, RISK_ZONES, WILPATTU_ZONES } from './fixtures';
+import { EXISTING_RULES, OPTIONS, RISK_ZONES, RULES_ALL_STATUSES, WILPATTU_ZONES } from './fixtures';
 
 describe('monitoringRuleUtils - steps', () => {
   test('the flow has two configuration steps followed by Review as step 3 of 3', () => {
@@ -107,7 +107,44 @@ describe('monitoringRuleUtils - display helpers', () => {
     expect(filterByTab(EXISTING_RULES, LIST_TABS.ACTIVE).map((rule) => rule.id)).toEqual([12]);
     expect(filterByTab(EXISTING_RULES, LIST_TABS.DRAFT).map((rule) => rule.id)).toEqual([11]);
     expect(filterByTab(EXISTING_RULES, LIST_TABS.ALL)).toHaveLength(2);
-    expect(countByTab(EXISTING_RULES)).toEqual({ ALL: 2, ACTIVE: 1, DRAFT: 1 });
+    expect(countByTab(EXISTING_RULES)).toEqual({ ALL: 2, ACTIVE: 1, DRAFT: 1, INACTIVE: 0 });
+    expect(filterByTab(RULES_ALL_STATUSES, LIST_TABS.INACTIVE).map((rule) => rule.id)).toEqual([9]);
+    expect(countByTab(RULES_ALL_STATUSES)).toEqual({ ALL: 3, ACTIVE: 1, DRAFT: 1, INACTIVE: 1 });
+  });
+
+  test('details-dialog actions follow the rule status: DRAFT edit/activate, ACTIVE deactivate, INACTIVE none', () => {
+    expect(getRuleActions('DRAFT')).toEqual([RULE_ROW_ACTIONS.EDIT, RULE_ROW_ACTIONS.ACTIVATE]);
+    expect(getRuleActions('ACTIVE')).toEqual([RULE_ROW_ACTIONS.DEACTIVATE]);
+    expect(getRuleActions('INACTIVE')).toEqual([]);
+    [undefined, null, 'ARCHIVED', 'toString', '__proto__'].forEach((status) => {
+      expect(getRuleActions(status)).toEqual([]);
+    });
+  });
+
+  test('a saved rule maps back to the configuration form values', () => {
+    const draft = EXISTING_RULES[1];
+    expect(toRuleForm(draft)).toEqual({
+      hazardType: 'ELEPHANT_CROP_RAIDING_FENCE_BREACH',
+      riskZoneId: 2,
+      alertPriority: 'LOW',
+      notificationRecipients: ['community_liaison_officer'],
+      responseBehaviour: 'PLACEHOLDER_RESPONSE',
+      notes: 'Seasonal',
+    });
+    expect(toRuleForm(draft).notificationRecipients).not.toBe(draft.notificationRecipients);
+    expect(toRuleForm({ ...draft, notes: null }).notes).toBe('');
+    expect(toRuleForm(null)).toEqual(EMPTY_RULE_FORM);
+    // Round trip: the edited form produces the same payload the rule was saved with
+    expect(buildRulePayload(toRuleForm(draft), 1)).toEqual({
+      parkId: 1, hazardType: draft.hazardType, riskZoneId: 2, alertPriority: 'LOW',
+      notificationRecipients: ['community_liaison_officer'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: 'Seasonal',
+    });
+  });
+
+  test('errors on a saved rule describe a 404 as a missing rule, not a missing park', () => {
+    expect(describeRuleError({ status: 404 })).toMatch(/monitoring rule no longer exists/);
+    expect(describeRuleError({ status: 409, message: 'Only DRAFT rules can be activated.' })).toBe('Only DRAFT rules can be activated.');
+    expect(describeRuleError(new TypeError('Failed to fetch'))).toMatch(/Unable to reach the monitoring rules service/);
   });
 
   test('API errors become safe, status-specific messages for the Park Manager', () => {

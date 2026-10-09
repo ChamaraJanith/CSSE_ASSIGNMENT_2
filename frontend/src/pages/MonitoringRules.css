@@ -110,7 +110,132 @@
 }
 
 .mr-table {
-  min-width: 860px;
+  min-width: 960px;
+}
+
+/* --- Row actions --- */
+.mr-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mr-row-action.btn-tactical {
+  padding: 5px 9px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+/* --- Dialogs (rule details, activate / deactivate confirmation) ---
+   RuleModal renders these into document.body, outside .mr-container's stacking context, so the
+   backdrop sits above the dashboard's sticky .top-header (z-index 15). The top inset keeps the
+   dialog clear of that 70px header; the dialog's own header and footer stay in place and only
+   .mr-modal-body scrolls. */
+.mr-modal-backdrop {
+  --mr-modal-top: 86px;
+  --mr-modal-edge: 24px;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  padding: var(--mr-modal-top) var(--mr-modal-edge) var(--mr-modal-edge);
+  box-sizing: border-box;
+  /* Safety net only: the dialog's max-height keeps it inside the viewport */
+  overflow-y: auto;
+  color: var(--cmd-text-body);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* margin: auto centres the dialog without the top being cut off, which flex centring
+   (align-items: center) does when a child is taller than its container */
+.mr-modal.panel-card {
+  margin: auto;
+  width: 100%;
+  max-width: 620px;
+  max-height: calc(100vh - var(--mr-modal-top) - var(--mr-modal-edge));
+  max-height: calc(100dvh - var(--mr-modal-top) - var(--mr-modal-edge));
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  background: #06140f;
+}
+
+.mr-modal-header {
+  flex: none;
+  gap: 12px;
+  padding: 18px 22px 14px;
+}
+
+.mr-modal-header .panel-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mr-modal-header .mr-icon-button {
+  flex: none;
+}
+
+.mr-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 22px;
+}
+
+.mr-modal-footer {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Details dialog: room for the risk-zone map */
+.mr-modal.mr-modal-wide {
+  max-width: 780px;
+}
+
+.mr-modal .mr-map-canvas {
+  height: 260px;
+}
+
+.mr-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: transparent;
+  color: var(--cmd-text-heading);
+  cursor: pointer;
+}
+
+.mr-icon-button:hover {
+  border-color: rgba(6, 182, 212, 0.6);
+}
+
+.mr-dialog-explanation {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.mr-dialog-explanation p {
+  margin: 0;
 }
 
 /* --- Status badges --- */
@@ -727,6 +852,15 @@
 }
 
 /* --- Responsive --- */
+/* Short viewports (e.g. landscape phones): the dialog covers the app header instead of losing
+   most of its height to the top inset; it is above the header, so nothing is hidden */
+@media (max-height: 560px) {
+  .mr-modal-backdrop {
+    --mr-modal-top: 12px;
+    --mr-modal-edge: 12px;
+  }
+}
+
 @media (max-width: 900px) {
   .mr-step1-grid {
     grid-template-columns: 1fr;
@@ -763,6 +897,28 @@
 
   .mr-state {
     padding: 24px 12px;
+  }
+
+  /* Small screens: the dialog uses (almost) the whole viewport; the header with the close
+     button and the footer with the actions stay visible while the body scrolls */
+  .mr-modal-backdrop {
+    --mr-modal-top: 8px;
+    --mr-modal-edge: 8px;
+  }
+
+  .mr-modal-header,
+  .mr-modal-body,
+  .mr-modal-footer {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .mr-modal-footer .btn-tactical {
+    flex: 1 1 auto;
+  }
+
+  .mr-modal .mr-map-canvas {
+    height: 200px;
   }
 
   .mr-map-canvas {

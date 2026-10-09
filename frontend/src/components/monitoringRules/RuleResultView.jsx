@@ -15,8 +15,11 @@ const ACTION_STATUS = {
   [RULE_ACTIONS.SAVE_DRAFT]: RULE_STATUSES.DRAFT,
 };
 
+const EDITED_DRAFT_MESSAGE = 'The draft has been updated. It keeps its rule ID and is not active.';
+
+// result.edited: a saved draft was updated (same rule, still a draft) instead of a new rule being created
 export default function RuleResultView({ result, parkName, riskZones, options, onBackToList, onCreateAnother }) {
-  const { rule, action } = result;
+  const { rule, action, edited = false } = result;
   const status = rule.status || ACTION_STATUS[action];
   const isActive = status === RULE_STATUSES.ACTIVE;
 
@@ -25,8 +28,8 @@ export default function RuleResultView({ result, parkName, riskZones, options, o
       <div className="mr-result-header" role="status">
         <CheckCircle2 size={34} />
         <div>
-          <h2>Monitoring Rule Created Successfully</h2>
-          <p>{OUTCOME_MESSAGES[status] || result.message}</p>
+          <h2>{edited ? 'Draft Monitoring Rule Updated' : 'Monitoring Rule Created Successfully'}</h2>
+          <p>{edited ? EDITED_DRAFT_MESSAGE : OUTCOME_MESSAGES[status] || result.message}</p>
         </div>
       </div>
 
@@ -37,6 +40,7 @@ export default function RuleResultView({ result, parkName, riskZones, options, o
         </div>
         <dl className="mr-result-meta">
           <div><dt>Created</dt><dd>{formatDateTime(rule.createdAt)}</dd></div>
+          {edited && <div><dt>Updated</dt><dd>{formatDateTime(rule.updatedAt)}</dd></div>}
           {isActive && rule.activatedAt && (
             <div><dt>Activated</dt><dd>{formatDateTime(rule.activatedAt)}</dd></div>
           )}

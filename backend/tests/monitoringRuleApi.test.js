@@ -5,7 +5,7 @@ const { getPool } = require('../pgPool');
 const monitoringRuleRoutes = require('../routes/monitoringRuleRoutes');
 const monitoringRuleService = require('../services/monitoringRuleService');
 const {
-  MANAGER_ID, HAZARD, CREATED_AT, yalaPark, zoneRow, ruleRow, ruleInput, createSupabaseFake, createRulePgFake
+  MANAGER_ID, HAZARD, CREATED_AT, UPDATED_AT, yalaPark, zoneRow, ruleRow, ruleInput, createSupabaseFake, createRulePgFake
 } = require('./helpers/monitoringRuleFakes');
 
 jest.mock('../supabaseClient', () => ({
@@ -66,6 +66,27 @@ const ENDPOINTS = [
     send: (headers) => request(app).post(BASE).set(headers).send(ruleInput({ action: 'ACTIVATE' })),
     arrange: () => { asParkManager(); createRulePgFake(getPool); },
     okStatus: 201
+  },
+  {
+    name: 'PUT /:id',
+    send: (headers) => request(app).put(`${BASE}/10`).set(headers).send(ruleInput()),
+    arrange: () => { asParkManager(); createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })] }); },
+    okStatus: 200
+  },
+  {
+    name: 'POST /:id/activate',
+    send: (headers) => request(app).post(`${BASE}/10/activate`).set(headers),
+    arrange: () => { asParkManager(); createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })] }); },
+    okStatus: 200
+  },
+  {
+    name: 'POST /:id/deactivate',
+    send: (headers) => request(app).post(`${BASE}/12/deactivate`).set(headers),
+    arrange: () => {
+      asParkManager();
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 12, status: 'ACTIVE', activated_at: CREATED_AT })] });
+    },
+    okStatus: 200
   }
 ];
 
@@ -501,6 +522,218 @@ describe('UC04: Monitoring Rules API (/api/monitoring-rules)', () => {
       createRulePgFake(getPool);
       const res = await request(app).post(`${BASE}/`).set(AUTH).send(ruleInput({ action: 'SAVE_DRAFT' }));
       expect(res.status).toBe(201);
+    });
+  });
+
+  describe('POST /validate with a rule ID (editing a draft)', () => {
+    beforeEach(() => asParkManager());
+
+    test('[POSITIVE CASE] the edited draft should not be a duplicate of itself', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })] });
+      const res = await validate(ruleInput({ ruleId: 10 }));
+      expect(res.status).toBe(200);
+      expect(res.body.data).toMatchObject({ valid: true, conflicts: [] });
+    });
+
+    test('[NEGATIVE CASE] another identical draft is still reported', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 }), ruleRow({ id: 11 })] });
+      const res = await validate(ruleInput({ ruleId: 10 }));
+      expect(res.status).toBe(200);
+      expect(res.body.data.conflicts).toEqual([expect.objectContaining({ type: 'DUPLICATE', ruleId: 11 })]);
+    });
+
+    test('[NEGATIVE CASE] an invalid rule ID should return 400', async () => {
+      createRulePgFake(getPool);
+      const res = await validate(ruleInput({ ruleId: 'abc' }));
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: 'Rule ID must be a positive integer.' });
+    });
+  });
+
+  describe('PUT /:id (update draft)', () => {
+    const update = (id, body) => request(app).put(`${BASE}/${id}`).set(AUTH).send(body);
+
+    beforeEach(() => asParkManager());
+
+    test('[POSITIVE CASE] should return 200 with the same rule id, still DRAFT, and no new rule', async () => {
+      const db = createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, alert_priority: 'LOW' })] });
+      const res = await update(10, ruleInput({ alertPriority: 'CRITICAL', action: 'ACTIVATE' }));
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe('Draft monitoring rule updated.');
+      expect(res.body.data).toMatchObject({
+        id: 10, status: 'DRAFT', alertPriority: 'CRITICAL', activatedAt: null, createdBy: MANAGER_ID, updatedAt: UPDATED_AT
+      });
+      expect(db.find('INSERT')).toHaveLength(0);
+    });
+
+    test('[NEGATIVE CASE] an unknown rule should return 404', async () => {
+      createRulePgFake(getPool, { existingRules: [] });
+      const res = await update(99, ruleInput());
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: 'Monitoring rule not found.' });
+    });
+
+    test('[NEGATIVE CASE] an ACTIVE rule should return 409', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status: 'ACTIVE', activated_at: CREATED_AT })] });
+      const res = await update(10, ruleInput());
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/Only DRAFT rules can be edited/);
+    });
+
+    test('[NEGATIVE CASE] a conflict with an ACTIVE rule should return 409 with conflicts', async () => {
+      createRulePgFake(getPool, {
+        existingRules: [ruleRow({ id: 10 }), ruleRow({ id: 12, status: 'ACTIVE', alert_priority: 'LOW', activated_at: CREATED_AT })]
+      });
+      const res = await update(10, ruleInput());
+      expect(res.status).toBe(409);
+      expect(res.body.conflicts).toEqual([expect.objectContaining({ type: 'CONFLICT', ruleId: 12 })]);
+    });
+
+    test('[NEGATIVE CASE] invalid fields should return 400 with errors', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })] });
+      const res = await update(10, ruleInput({ hazardType: '' }));
+      expect(res.status).toBe(400);
+      expect(res.body.errors).toEqual([expect.objectContaining({ field: 'hazardType', code: 'REQUIRED' })]);
+    });
+
+    test.each(['abc', '0', '1.5', '-2'])('[NEGATIVE CASE] rule id %p should return 400', async (id) => {
+      createRulePgFake(getPool);
+      const res = await update(id, ruleInput());
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: 'Rule ID must be a positive integer.' });
+    });
+
+    test.each([['no body', undefined], ['an array body', [ruleInput()]]])(
+      '[NEGATIVE CASE] %s should return 400 before touching the database',
+      async (_label, body) => {
+        const req = request(app).put(`${BASE}/10`).set(AUTH);
+        const res = await (body === undefined ? req : req.send(body));
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: 'A JSON monitoring rule request body is required.' });
+        expect(getPool).not.toHaveBeenCalled();
+      }
+    );
+
+    test('[ERROR CASE] a database failure should return a safe 500', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })], failOn: 'UPDATE public.monitoring_rules' });
+      const res = await update(10, ruleInput());
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: GENERIC_500 });
+      expectNoLeak(res);
+    });
+  });
+
+  describe('POST /:id/activate', () => {
+    const activate = (id) => request(app).post(`${BASE}/${id}/activate`).set(AUTH);
+
+    beforeEach(() => asParkManager());
+
+    test('[POSITIVE CASE] a DRAFT should return 200 as ACTIVE with an activation time', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })] });
+      const res = await activate(10);
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe('Monitoring rule activated successfully.');
+      expect(res.body.data).toMatchObject({ id: 10, status: 'ACTIVE', activatedAt: UPDATED_AT, updatedAt: UPDATED_AT });
+    });
+
+    test('[NEGATIVE CASE] an unknown rule should return 404', async () => {
+      createRulePgFake(getPool, { existingRules: [] });
+      const res = await activate(10);
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: 'Monitoring rule not found.' });
+    });
+
+    test.each(['ACTIVE', 'INACTIVE'])('[NEGATIVE CASE] an %s rule should return 409', async (status) => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10, status, activated_at: status === 'ACTIVE' ? CREATED_AT : null })] });
+      const res = await activate(10);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/Only DRAFT rules can be activated/);
+    });
+
+    test('[NEGATIVE CASE] an active conflict should return 409 with conflicts', async () => {
+      createRulePgFake(getPool, {
+        existingRules: [ruleRow({ id: 10 }), ruleRow({ id: 12, status: 'ACTIVE', alert_priority: 'LOW', activated_at: CREATED_AT })]
+      });
+      const res = await activate(10);
+      expect(res.status).toBe(409);
+      expect(res.body.conflicts).toEqual([expect.objectContaining({ type: 'CONFLICT', ruleId: 12 })]);
+    });
+
+    test('[NEGATIVE CASE] a draft that no longer passes validation should return 400 with errors', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })], zone: null });
+      const res = await activate(10);
+      expect(res.status).toBe(400);
+      expect(res.body.errors).toEqual([expect.objectContaining({ field: 'riskZoneId', code: 'NOT_FOUND' })]);
+    });
+
+    test('[NEGATIVE CASE] an invalid rule id should return 400', async () => {
+      createRulePgFake(getPool);
+      const res = await activate('abc');
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: 'Rule ID must be a positive integer.' });
+    });
+
+    test('[ERROR CASE] a concurrent activation (23505) should return 409 without database details', async () => {
+      const uniqueViolation = Object.assign(
+        new Error('duplicate key value violates unique constraint "ux_monitoring_rules_active_scope"'),
+        { code: '23505' }
+      );
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })], failOn: 'UPDATE public.monitoring_rules', failWith: uniqueViolation });
+      const res = await activate(10);
+      expect(res.status).toBe(409);
+      expectNoLeak(res);
+    });
+
+    test('[ERROR CASE] a database failure should return a safe 500', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 10 })], failOn: 'UPDATE public.monitoring_rules' });
+      const res = await activate(10);
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: GENERIC_500 });
+      expectNoLeak(res);
+    });
+  });
+
+  describe('POST /:id/deactivate', () => {
+    const deactivate = (id) => request(app).post(`${BASE}/${id}/deactivate`).set(AUTH);
+
+    beforeEach(() => asParkManager());
+
+    test('[POSITIVE CASE] an ACTIVE rule should return 200 as INACTIVE with activatedAt null', async () => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 12, status: 'ACTIVE', activated_at: CREATED_AT })] });
+      const res = await deactivate(12);
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe('Monitoring rule deactivated.');
+      expect(res.body.data).toMatchObject({ id: 12, status: 'INACTIVE', activatedAt: null, updatedAt: UPDATED_AT, alertPriority: 'HIGH' });
+    });
+
+    test.each(['DRAFT', 'INACTIVE'])('[NEGATIVE CASE] a %s rule should return 409', async (status) => {
+      createRulePgFake(getPool, { existingRules: [ruleRow({ id: 12, status })] });
+      const res = await deactivate(12);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/Only ACTIVE rules can be deactivated/);
+    });
+
+    test('[NEGATIVE CASE] an unknown rule should return 404', async () => {
+      createRulePgFake(getPool, { existingRules: [] });
+      const res = await deactivate(12);
+      expect(res.status).toBe(404);
+    });
+
+    test('[NEGATIVE CASE] an invalid rule id should return 400', async () => {
+      createRulePgFake(getPool);
+      const res = await deactivate('12abc');
+      expect(res.status).toBe(400);
+    });
+
+    test('[ERROR CASE] a database failure should return a safe 500', async () => {
+      createRulePgFake(getPool, {
+        existingRules: [ruleRow({ id: 12, status: 'ACTIVE', activated_at: CREATED_AT })], failOn: 'SELECT id, park_id, hazard_type'
+      });
+      const res = await deactivate(12);
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: GENERIC_500 });
+      expectNoLeak(res);
     });
   });
 });

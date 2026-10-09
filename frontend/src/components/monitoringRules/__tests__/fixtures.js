@@ -32,6 +32,22 @@ export const WILPATTU_ZONES = [
   },
 ];
 
+// Udawalawe park (02_seed_data.sql) and its zones (seed_other_parks.js); ids are illustrative
+export const UDAWALAWE_PARK = { id: 3, code: 'UDAW-NP', name: 'Udawalawe National Park' };
+
+export const UDAWALAWE_ZONES = [
+  {
+    id: 7, zoneCode: 'RZ-UDAW-01', zoneName: 'Mau Ara Southern Fence Boundary',
+    severityLevel: 'CRITICAL', primaryThreat: 'Severe Elephant Crop-Raiding & Electric Fence Breaches',
+    centerLat: 6.442, centerLng: 80.892, radiusKm: 3,
+  },
+  {
+    id: 8, zoneCode: 'RZ-UDAW-02', zoneName: 'Reservoir Spillway Buffer',
+    severityLevel: 'MEDIUM', primaryThreat: 'Illegal Cattle Grazing & Timber Clearing',
+    centerLat: 6.495, centerLng: 80.875, radiusKm: 2.2,
+  },
+];
+
 // Same order as the backend sends them
 export const OPTIONS = {
   hazardTypes: [
@@ -61,6 +77,8 @@ export const OPTIONS = {
 export const REFERENCE = { park: PARK, riskZones: RISK_ZONES, options: OPTIONS };
 
 export const WILPATTU_REFERENCE = { park: WILPATTU_PARK, riskZones: WILPATTU_ZONES, options: OPTIONS };
+
+export const UDAWALAWE_REFERENCE = { park: UDAWALAWE_PARK, riskZones: UDAWALAWE_ZONES, options: OPTIONS };
 
 const CREATED_AT = '2026-10-08T02:00:00.000Z';
 
@@ -111,6 +129,23 @@ export const EXISTING_RULES = [
     notificationRecipients: ['community_liaison_officer'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: 'Seasonal',
   }, 'DRAFT', { id: 11 }),
 ];
+
+export const UPDATED_AT = '2026-10-09T04:15:00.000Z';
+
+// A deactivated rule: configuration kept, activatedAt cleared by the backend
+export const INACTIVE_RULE = createdRule({
+  parkId: 1, hazardType: 'ILLEGAL_FISHING_CAMPSITES', riskZoneId: 1, alertPriority: 'MEDIUM',
+  notificationRecipients: ['wildlife_officer'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: null,
+}, 'INACTIVE', { id: 9, updatedAt: UPDATED_AT, riskZone: { id: 1, zoneCode: 'RZ-YALA-01', zoneName: 'Northern River Basin Buffer' } });
+
+// One rule of every status (ACTIVE #12, DRAFT #11, INACTIVE #9)
+export const RULES_ALL_STATUSES = [...EXISTING_RULES, INACTIVE_RULE];
+
+// A saved ACTIVE rule of `park` in `zone`, as the list endpoint returns it (joined zone has no geometry)
+export const ruleInZone = (park, zone, overrides = {}) => createdRule({
+  parkId: park.id, hazardType: 'POACHING_SNARING', riskZoneId: zone.id, alertPriority: 'HIGH',
+  notificationRecipients: ['park_manager'], responseBehaviour: 'PLACEHOLDER_RESPONSE', notes: null,
+}, 'ACTIVE', { id: 30 + zone.id, riskZone: { id: zone.id, zoneCode: zone.zoneCode, zoneName: zone.zoneName }, ...overrides });
 
 // Mirrors an ApiService error (message + HTTP status + optional structured details)
 export const apiError = (status, message, details = {}) => Object.assign(new Error(message), { status }, details);
