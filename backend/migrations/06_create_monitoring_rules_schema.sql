@@ -14,8 +14,9 @@
 -- notification_recipients and response_behaviour value sets are validated in
 -- code so they can be confirmed without a schema change.
 --
--- Status lifecycle (current UC04 scope): NEW -> DRAFT, NEW -> ACTIVE.
--- INACTIVE is reserved and is not written by the current UC04 implementation.
+-- Status lifecycle (current UC04 scope): NEW -> DRAFT, NEW -> ACTIVE,
+-- DRAFT -> DRAFT (edit), DRAFT -> ACTIVE, ACTIVE -> INACTIVE (final).
+-- INACTIVE rules are kept and are ignored by duplicate / conflict detection.
 -- ==============================================================================
 
 -- 1. Monitoring Rules Table

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Shield, Plus, RefreshCw, AlertTriangle, CheckCircle2, Eye } from 'lucide-react';
 import RuleStatusBadge from './RuleStatusBadge';
 import {
@@ -21,6 +21,15 @@ export default function MonitoringRuleList({
 }) {
   const counts = countByTab(rules);
   const visibleRules = filterByTab(rules, activeTab);
+  const noticeRef = useRef(null);
+
+  // The notice only appears after a successful Activate / Deactivate. The closing dialog cannot return
+  // focus to its View Details button because the table is unmounted while the list reloads, so focus
+  // moves to the notice instead of falling back to the page body. (RuleModal's focus restore runs
+  // first, in the effect cleanup, so this always wins.)
+  useEffect(() => {
+    if (notice) noticeRef.current?.focus();
+  }, [notice]);
 
   return (
     <div className="panel-card mr-panel">
@@ -39,7 +48,7 @@ export default function MonitoringRuleList({
       {createHint && <p className="mr-muted">{createHint}</p>}
 
       {notice && (
-        <div className="mr-notice" role="status" aria-label="Rule update">
+        <div ref={noticeRef} className="mr-notice" role="status" aria-label="Rule update" tabIndex={-1}>
           <CheckCircle2 size={18} /> {notice}
         </div>
       )}

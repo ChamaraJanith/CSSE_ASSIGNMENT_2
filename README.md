@@ -11,7 +11,7 @@
 [![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://supabase.com/)
 [![Leaflet](https://img.shields.io/badge/GIS-Leaflet-199900?style=for-the-badge&logo=leaflet&logoColor=white)](https://leafletjs.com/)
-[![Jest Tests](https://img.shields.io/badge/Jest_Tests-585%20Passed%20(100%25)-brightgreen?style=for-the-badge&logo=jest&logoColor=white)](https://jestjs.io/)
+[![Jest Tests](https://img.shields.io/badge/Jest_Tests-593%20Passed%20(100%25)-brightgreen?style=for-the-badge&logo=jest&logoColor=white)](https://jestjs.io/)
 [![Academic](https://img.shields.io/badge/SLIIT-SE3070%20Assignment%2002-orange?style=for-the-badge)]()
 
 </div>
@@ -46,9 +46,9 @@ Following the design critique of Assignment 01, **Group_041** implemented all fo
 1. **Algorithmic Patrol Optimization** based on explainable multi-factor heuristic risk scoring.
 2. **Forensic Evidence Review & Rapid Escalation** preserving chain-of-custody for acoustic sensors and camera traps.
 3. **Community Conflict Coordination & Telemetry Tracking** with automated priority calculation and ranger dispatch.
-4. **Dynamic Park Monitoring Rules Engine** featuring automated geometric boundary validation and duplicate conflict detection.
+4. **Park-Specific Monitoring Rule Configuration** with park/risk-zone ownership validation and duplicate/conflict detection.
 
-The solution adheres strictly to **SOLID design principles**, clean **Layered Architecture (Routes ➔ Controllers ➔ Services ➔ Database)**, offline-aware design patterns, and exhaustive automated testing (**13 Test Suites, 585 Automated Tests, 100% Passing**).
+The solution adheres strictly to **SOLID design principles**, clean **Layered Architecture (Routes ➔ Controllers ➔ Services ➔ Database)**, offline-aware design patterns, and exhaustive automated testing (**13 Test Suites, 593 Automated Tests, 100% Passing**).
 
 ---
 
@@ -162,19 +162,20 @@ The solution adheres strictly to **SOLID design principles**, clean **Layered Ar
 
 ### 4. UC04: Configure Park-Specific Wildlife Monitoring Rules
 * **Lead Contributor:** Dissanayake D.M.S.S (`IT23437470`)
-* **Primary Actor:** Park Manager | **Supporting Actor:** Wildlife Officer
-* **Domain Objective:** Provide dynamic configuration of park-specific surveillance rules, geofenced risk zones, and sensor sensitivity thresholds.
+* **Primary Actor:** Park Manager
+* **Domain Objective:** Lets a Park Manager configure a monitoring rule for the selected park (wildlife hazard, one of the park's existing risk zones, alert priority, notification recipients and response behaviour), validate it, review it, and activate it or save it as a draft.
 * **Core Technical Features & Innovations:**
-  * **Multi-Step Rule Configuration Wizard:** Guided stepper interface configuring park jurisdiction, target wildlife hazard/species, spatial risk zone, alert priority, and notification recipients.
-  * **Automated Boundary & Conflict Validation:** Validates that selected risk zones belong to the target park; performs duplicate and conflicting active rule checking to prevent contradictory sensor activations.
-  * **Review & Verification Stage:** Pre-activation summary displaying all parameters with inline edit controls triggering automatic revalidation.
-  * **Dynamic Lifecycle Management:** Explicitly separates `Draft`/`Inactive` saving from formal rule activation (`Active`).
-  * **Rule Activation & Management Actions:** Comprehensive management dialogs including activation, deactivation, staging, and rule duplication.
+  * **Multi-Step Rule Configuration Wizard:** Three-step wizard: Hazard & Risk Zone → Priority & Notifications (priority, recipients, response behaviour, notes) → Review. The park is taken from the dashboard park selector.
+  * **Park/Zone and Conflict Validation:** Validates that the selected risk zone belongs to the selected park (`BR03`), and blocks duplicate rules (DC1) and conflicting ACTIVE rules (DC2) in the same park + hazard + risk-zone scope.
+  * **Review & Verification Stage:** Pre-activation summary of all parameters. Edit returns to configuration; the rule must be resubmitted for validation before it can be reviewed again (`BR09`).
+  * **Lifecycle Management:** Save as Draft stores `DRAFT`; Activate stores `ACTIVE`. `INACTIVE` is only reached by deactivating an `ACTIVE` rule and is final.
+  * **Rule Management Actions:** Rule details dialog: edit or activate a `DRAFT`, deactivate an `ACTIVE` rule; `INACTIVE` rules are read-only.
+  * **Configuration Only:** Response behaviour and notification recipients are stored as rule configuration only. UC04 does not match events, send notifications, create incidents or escalate.
 * **Business Rules Implemented:** `BR01` through `BR10` (Role authorization, mandatory parameters, park-zone containment, duplicate rule prevention, review before activation, unique rule ID generation).
 * **Code Implementation:**
-  * **Backend:** `monitoringRuleRoutes.js`, `monitoringRuleController.js`, `monitoringRuleService.js`
-  * **Frontend:** `monitoringRules/MonitoringRulesManager.jsx`, `RuleConfigurationForm.jsx`, `RiskZoneMap.jsx`, `MonitoringRuleList.jsx`, `RuleActivationDialog.jsx`, `RuleReviewView.jsx`, `RuleResultView.jsx`, `RuleModal.jsx`, `RuleStepper.jsx`, `RuleValidationErrors.jsx`, `monitoringRuleUtils.js`, `useEscapeKey.js`, `ParkManagerDashboard.jsx`
-* **Test Verification:** **3 Test Suites, 397 Passed Tests** (100% pass rate).
+  * **Backend:** `monitoringRuleRoutes.js`, `monitoringRuleController.js`, `monitoringRuleService.js`, `utils/monitoringRuleRules.js`, `utils/monitoringRuleConfig.js`, `middleware/requireParkManager.js`, `migrations/06_create_monitoring_rules_schema.sql`
+  * **Frontend:** `monitoringRules/MonitoringRulesManager.jsx`, `RuleConfigurationForm.jsx`, `RiskZoneMap.jsx`, `MonitoringRuleList.jsx`, `RuleActivationDialog.jsx`, `RuleActionsMenu.jsx`, `RuleDetailsView.jsx`, `RuleReviewView.jsx`, `RuleResultView.jsx`, `RuleModal.jsx`, `RuleStatusBadge.jsx`, `RuleStepper.jsx`, `RuleValidationErrors.jsx`, `monitoringRuleUtils.js`, `useEscapeKey.js`, `ParkManagerDashboard.jsx`
+* **Test Verification:** **3 backend Test Suites, 405 Passed Tests; 7 frontend test files, 144 Passed Tests** (100% pass rate).
 
 ---
 
@@ -189,12 +190,12 @@ The backend contains a robust automated test suite built on **Jest** and **Super
 | **UC01** | Patrol Planning, Heuristics, Allocation & Staging | `patrolPlanningController.test.js`<br>`patrolPlanningService.test.js`<br>`heuristicsEngine.test.js`<br>`rangerService.test.js`<br>`parkInfrastructureService.test.js` | **65** | ✅ **PASSED** |
 | **UC02** | Camera Trap Evidence Triage & Escalation | `evidenceReviewApi.test.js`<br>`evidenceReviewRules.test.js`<br>`evidenceReviewService.test.js` | **104** | ✅ **PASSED** |
 | **UC03** | Conflict Reporting, Intake & Closure Auditing | `reportController.test.js`<br>`reportCreate.test.js` | **19** | ✅ **PASSED** |
-| **UC04** | Monitoring Rules Validation, Conflicts & Lifecycle | `monitoringRuleApi.test.js`<br>`monitoringRuleRules.test.js`<br>`monitoringRuleService.test.js` | **397** | ✅ **PASSED** |
-| **TOTAL** | **Full System Test Suite** | **13 Test Suites** | **585** | ✅ **100% PASS** |
+| **UC04** | Monitoring Rules Validation, Conflicts & Lifecycle | `monitoringRuleApi.test.js`<br>`monitoringRuleRules.test.js`<br>`monitoringRuleService.test.js` | **405** | ✅ **PASSED** |
+| **TOTAL** | **Full System Test Suite** | **13 Test Suites** | **593** | ✅ **100% PASS** |
 
 ### How to Run Tests
 ```bash
-# Run all 585 tests across all 4 use cases
+# Run all 593 tests across all 4 use cases
 cd backend
 npm test
 
@@ -261,7 +262,7 @@ CSSE_ASSIGNMENT_2/
 │   │   └── monitoringRuleService.js      # UC04 Rule conflict detection & validation
 │   ├── utils/
 │   │   └── heuristicsEngine.js           # UC01 Algorithmic RoutePriorityScore calculator
-│   ├── tests/                            # 13 Jest Test Suites (585 Tests)
+│   ├── tests/                            # 13 Jest Test Suites (593 Tests)
 │   ├── .env.example                      # Template environment variable configurations
 │   ├── index.js                          # Express server entry point
 │   ├── supabaseClient.js                 # Database client and Admin SDK initialization
@@ -422,13 +423,14 @@ Once running, navigate to **`http://localhost:5173`** in your browser.
 * `POST /api/reports/:id/clarify` - Dispatches a clarification request for incomplete reports.
 
 ### UC04: Monitoring Rules Endpoints (`/api/monitoring-rules`)
-* `GET /` - Retrieves monitoring rules for the park.
-* `POST /` - Validates and creates a new monitoring rule (`Active` or `Draft`).
-* `GET /:id` - Fetches full rule configuration by ID.
-* `PUT /:id` - Updates an existing rule with revalidation.
-* `PATCH /:id/status` - Transitions rule state (`Active`, `Inactive`, `Deprecated`).
-* `GET /parks` - Lists registered national parks.
-* `GET /risk-zones` - Retrieves designated spatial risk zones.
+All endpoints require an authenticated Park Manager.
+* `GET /reference?parkId=` - Returns the selected park, its risk zones and the configured option lists.
+* `GET /?parkId=` - Retrieves monitoring rules for the park.
+* `POST /validate` - Dry-run validation (mandatory fields, park/zone ownership, duplicates/conflicts); never writes. An optional `ruleId` excludes a draft being edited from its own duplicate check.
+* `POST /` - Revalidates and creates a rule; `action` `ACTIVATE` stores `ACTIVE`, `SAVE_DRAFT` stores `DRAFT`.
+* `PUT /:id` - Saves changes to a `DRAFT` rule (same ID, stays `DRAFT`; revalidated).
+* `POST /:id/activate` - `DRAFT` → `ACTIVE` (stored configuration revalidated).
+* `POST /:id/deactivate` - `ACTIVE` → `INACTIVE` (final).
 
 ---
 
