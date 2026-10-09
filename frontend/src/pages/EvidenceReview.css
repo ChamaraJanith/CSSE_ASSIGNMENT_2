@@ -206,8 +206,8 @@
 }
 
 .er-search {
-  flex: 0 1 260px;
-  min-width: 200px;
+  flex: 0 1 240px;
+  min-width: 180px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -312,9 +312,21 @@
   white-space: nowrap;
 }
 
+/* Keep location readable when the dashboard sidebar narrows the content area */
+.er-queue .tactical-table td:nth-child(4) {
+  min-width: 160px;
+}
+
 .er-queue .er-thumbnail {
-  width: 96px;
-  height: 64px;
+  width: 84px;
+  height: 56px;
+}
+
+/* Tighter horizontal padding so all seven columns fit beside the dashboard sidebar */
+.er-queue .tactical-table th,
+.er-queue .tactical-table td {
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 .er-queue .btn-tactical {
@@ -586,7 +598,7 @@
 
 .er-summary-row {
   display: grid;
-  grid-template-columns: 140px 1fr;
+  grid-template-columns: 140px minmax(0, 1fr);
   gap: 10px;
   align-items: center;
   font-size: 0.87rem;
@@ -594,6 +606,11 @@
 
 .er-summary-row dt {
   color: var(--er-text);
+}
+
+/* A status badge may wrap rather than push past a narrow card */
+.er-summary-row dd .er-status-badge {
+  white-space: normal;
 }
 
 .er-summary-row dd {
@@ -947,7 +964,7 @@
 }
 
 .er-escalate .er-summary-row {
-  grid-template-columns: 100px 1fr;
+  grid-template-columns: 100px minmax(0, 1fr);
 }
 
 /* Threat priority and recipient each read as their own card, as in the wireframe */
@@ -1114,16 +1131,17 @@
   color: var(--er-text-muted);
 }
 
-/* Evidence details | Review outcome */
+/* Evidence details | Review outcome; stacks when the card itself is narrow
+   (e.g. beside the dashboard sidebar on a tablet), not only on narrow viewports */
 .er-result-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
   gap: 8px 32px;
 }
 
 .er-result-column .er-summary-row,
 .er-result-extra .er-summary-row {
-  grid-template-columns: 130px 1fr;
+  grid-template-columns: 130px minmax(0, 1fr);
 }
 
 .er-result-extra {
@@ -1227,7 +1245,7 @@
   }
 
   .er-result-column .er-summary-row {
-    grid-template-columns: 110px 1fr;
+    grid-template-columns: 110px minmax(0, 1fr);
   }
 }
 
@@ -1260,7 +1278,7 @@
   }
 
   .er-summary-row {
-    grid-template-columns: 110px 1fr;
+    grid-template-columns: 110px minmax(0, 1fr);
   }
 
   .er-evidence-card,
