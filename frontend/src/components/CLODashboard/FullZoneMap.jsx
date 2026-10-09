@@ -1,8 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const FullZoneMap = () => {
   const mapRef = React.useRef(null);
   const mapInstance = React.useRef(null);
+  
+  // States for each zone's risk status
+  const [zone1Status, setZone1Status] = useState('HIGH_RISK');
+  const [zone2Status, setZone2Status] = useState('MEDIUM_RISK');
+  const [zone3Status, setZone3Status] = useState('NO_RISK');
+
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'HIGH_RISK': return '#ef4444'; // Red
+      case 'MEDIUM_RISK': return '#f59e0b'; // Amber/Orange
+      case 'NO_RISK': return '#10b981'; // Green
+      default: return '#10b981';
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch(status) {
+      case 'HIGH_RISK': return 'High Risk';
+      case 'MEDIUM_RISK': return 'Medium Risk';
+      case 'NO_RISK': return 'No Risk';
+      default: return 'No Risk';
+    }
+  };
 
   React.useEffect(() => {
     if (!document.getElementById('leaflet-css')) {
@@ -20,7 +43,6 @@ const FullZoneMap = () => {
       script.onload = initMap;
       document.body.appendChild(script);
     } else {
-      // Small timeout to ensure DOM is ready if script was already loaded
       setTimeout(initMap, 100);
     }
 
@@ -32,7 +54,6 @@ const FullZoneMap = () => {
       
       const L = window.L;
       
-      // Default to a central park location (e.g. Yala National Park coords)
       const map = L.map(mapRef.current).setView([6.3812, 81.4287], 11);
       mapInstance.current = map;
       
@@ -40,20 +61,18 @@ const FullZoneMap = () => {
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
       
-      // Draw zones
-      const zones = [
-        { name: 'Zone 1 - High Risk', color: '#ef4444', bounds: [[6.35, 81.4], [6.45, 81.5]] },
-        { name: 'Zone 2 - Buffer', color: '#f59e0b', bounds: [[6.25, 81.3], [6.35, 81.45]] },
-        { name: 'Zone 3 - Safe', color: '#10b981', bounds: [[6.4, 81.2], [6.5, 81.35]] }
+      const allZones = [
+        { name: `Zone 1 - ${getStatusLabel(zone1Status)}`, color: getStatusColor(zone1Status), bounds: [[6.35, 81.4], [6.45, 81.5]] },
+        { name: `Zone 2 - ${getStatusLabel(zone2Status)}`, color: getStatusColor(zone2Status), bounds: [[6.25, 81.3], [6.35, 81.45]] },
+        { name: `Zone 3 - ${getStatusLabel(zone3Status)}`, color: getStatusColor(zone3Status), bounds: [[6.4, 81.2], [6.5, 81.35]] }
       ];
 
-      zones.forEach(zone => {
-        L.rectangle(zone.bounds, { color: zone.color, weight: 2, fillOpacity: 0.2 })
+      allZones.forEach(zone => {
+        L.rectangle(zone.bounds, { color: zone.color, weight: 2, fillOpacity: 0.3 })
          .addTo(map)
          .bindTooltip(`<b>${zone.name}</b>`, { permanent: false, direction: "center" });
       });
 
-      // Add headquarters marker
       const hqIcon = L.icon({
         iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -69,13 +88,36 @@ const FullZoneMap = () => {
         mapInstance.current = null;
       }
     };
-  }, []);
+  }, [zone1Status, zone2Status, zone3Status]);
+
+  const StatusSelect = ({ label, value, onChange }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <label style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{label}</label>
+      <select 
+        value={value} 
+        onChange={onChange}
+        style={{ padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+      >
+        <option style={{color: 'black'}} value="HIGH_RISK">High Risk</option>
+        <option style={{color: 'black'}} value="MEDIUM_RISK">Medium Risk</option>
+        <option style={{color: 'black'}} value="NO_RISK">No Risk</option>
+      </select>
+    </div>
+  );
 
   return (
     <div className="dashboard-card-full" style={{ position: 'relative', zIndex: 10 }}>
-      <div className="card-header">
-        <h2>Interactive Zone Map</h2>
-        <p>Monitor wildlife zones, park boundaries, and high-risk areas in real-time.</p>
+      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h2>Interactive Zone Map</h2>
+          <p>Monitor wildlife zones, park boundaries, and set risk areas in real-time.</p>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '16px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <StatusSelect label="Zone 1 Status" value={zone1Status} onChange={e => setZone1Status(e.target.value)} />
+          <StatusSelect label="Zone 2 Status" value={zone2Status} onChange={e => setZone2Status(e.target.value)} />
+          <StatusSelect label="Zone 3 Status" value={zone3Status} onChange={e => setZone3Status(e.target.value)} />
+        </div>
       </div>
       <div style={{ marginTop: '20px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', overflow: 'hidden' }}>
         <div ref={mapRef} style={{ width: '100%', height: '600px', zIndex: 1, position: 'relative' }}></div>
